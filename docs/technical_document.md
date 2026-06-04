@@ -186,7 +186,7 @@ Agent tool ADS grain:
 date, agent_id, tool_name, tool_type
 ```
 
-For Spark ADS, p95 metrics use `percentile_approx`. For the local Flink ADS MVP, `p95_latency_ms` uses `MAX(latency_ms)` as a conservative streaming proxy because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate in this setup. ClickHouse DWD tables are available for proper serving-layer percentile queries.
+For Spark ADS, p95 metrics use `percentile_approx`. For the local Flink ADS MVP, `max_latency_ms` stores an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate in this setup. ClickHouse DWD tables are available for proper serving-layer percentile queries.
 
 ## 9. Local Verification
 

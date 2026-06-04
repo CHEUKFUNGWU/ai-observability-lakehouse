@@ -76,7 +76,8 @@ def test_flink_sql_layer_dependencies_are_explicit():
     assert "WHERE total_tokens = prompt_tokens + completion_tokens" in dwd_sql
     assert "INSERT INTO paimon_lake.ads.llm_feature_daily_metrics" in ads_sql
     assert "FROM paimon_lake.dwd.llm_request_events" in ads_sql
-    assert "CAST(MAX(latency_ms) AS DOUBLE) AS p95_latency_ms" in ads_sql
+    assert "CAST(MAX(latency_ms) AS DOUBLE) AS max_latency_ms" in ads_sql
+    assert "p95_latency_ms" not in ads_sql
     assert "PERCENTILE_CONT(" not in ads_sql
 
 

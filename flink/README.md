@@ -63,7 +63,7 @@ The runner starts the dedicated `flink-sql-client` service with `docker compose 
 
 The local TaskManager is configured with four slots so the ODS and DWD streaming jobs can keep running while batch verification queries or ADS builds use the remaining capacity.
 
-The Flink ADS SQL keeps the `p95_latency_ms` column for schema parity, but uses `MAX(latency_ms)` as a conservative local streaming proxy because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate.
+The Flink ADS SQL stores `max_latency_ms` as an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate.
 
 Run the SQL files in the order listed above. Long-running `INSERT INTO ... SELECT ...` statements are streaming jobs and should remain visible in the Flink Web UI.
 

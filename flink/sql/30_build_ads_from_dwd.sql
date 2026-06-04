@@ -15,8 +15,7 @@ SELECT
     SUM(estimated_cost_usd) AS estimated_cost_usd,
     AVG(latency_ms) AS avg_latency_ms,
     -- Flink 1.20 SQL does not support PERCENTILE_CONT as a streaming aggregate.
-    -- Keep the metric column as a conservative latency upper-bound for the local
-    -- stream-batch MVP; Spark/ClickHouse can compute exact or approximate p95.
-    CAST(MAX(latency_ms) AS DOUBLE) AS p95_latency_ms
+    -- Store an explicit upper-bound metric instead of naming MAX latency as p95.
+    CAST(MAX(latency_ms) AS DOUBLE) AS max_latency_ms
 FROM paimon_lake.dwd.llm_request_events
 GROUP BY `date`, app_name, feature_name, model_name;

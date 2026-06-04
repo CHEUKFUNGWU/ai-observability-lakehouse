@@ -190,8 +190,7 @@ CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_daily_metrics
     span_count UInt64,
     failed_span_count UInt64,
     tool_span_count UInt64,
-    llm_span_count UInt64,
-    span_failure_rate Float64
+    llm_span_count UInt64
 )
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(date)

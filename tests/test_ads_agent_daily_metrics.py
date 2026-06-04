@@ -10,6 +10,7 @@ def test_build_agent_daily_metrics_aggregates_runs_and_spans(spark):
         [
             {
                 "date": date(2026, 1, 1),
+                "run_id": "run_001",
                 "app_name": "ai_agent_platform",
                 "agent_id": "agent_support",
                 "agent_name": "customer_support_agent",
@@ -25,6 +26,7 @@ def test_build_agent_daily_metrics_aggregates_runs_and_spans(spark):
             },
             {
                 "date": date(2026, 1, 1),
+                "run_id": "run_002",
                 "app_name": "ai_agent_platform",
                 "agent_id": "agent_support",
                 "agent_name": "customer_support_agent",
@@ -44,12 +46,14 @@ def test_build_agent_daily_metrics_aggregates_runs_and_spans(spark):
         [
             {
                 "date": date(2026, 1, 1),
+                "run_id": "run_001",
                 "agent_id": "agent_support",
                 "span_type": "llm_call",
                 "status": "success",
             },
             {
                 "date": date(2026, 1, 1),
+                "run_id": "run_002",
                 "agent_id": "agent_support",
                 "span_type": "tool_call",
                 "status": "error",
@@ -71,4 +75,71 @@ def test_build_agent_daily_metrics_aggregates_runs_and_spans(spark):
     assert row["failed_span_count"] == 1
     assert "success_rate" not in row.asDict()
     assert "error_rate" not in row.asDict()
-    assert row["span_failure_rate"] == 0.5
+    assert "span_failure_rate" not in row.asDict()
+
+
+def test_build_agent_daily_metrics_keeps_span_metrics_at_run_group_grain(spark):
+    runs = spark.createDataFrame(
+        [
+            {
+                "date": date(2026, 1, 1),
+                "run_id": "run_support",
+                "app_name": "ai_agent_platform",
+                "agent_id": "agent_shared",
+                "agent_name": "shared_agent",
+                "task_type": "customer_support",
+                "status": "success",
+                "turn_count": 1,
+                "llm_call_count": 1,
+                "tool_call_count": 1,
+                "retrieval_count": 0,
+                "total_tokens": 100,
+                "estimated_cost_usd": 0.0001,
+                "duration_ms": 100,
+            },
+            {
+                "date": date(2026, 1, 1),
+                "run_id": "run_research",
+                "app_name": "ai_agent_platform",
+                "agent_id": "agent_shared",
+                "agent_name": "shared_agent",
+                "task_type": "research",
+                "status": "success",
+                "turn_count": 1,
+                "llm_call_count": 1,
+                "tool_call_count": 0,
+                "retrieval_count": 1,
+                "total_tokens": 200,
+                "estimated_cost_usd": 0.0002,
+                "duration_ms": 200,
+            },
+        ]
+    )
+    spans = spark.createDataFrame(
+        [
+            {
+                "date": date(2026, 1, 1),
+                "run_id": "run_support",
+                "agent_id": "agent_shared",
+                "span_type": "tool_call",
+                "status": "error",
+            },
+            {
+                "date": date(2026, 1, 1),
+                "run_id": "run_research",
+                "agent_id": "agent_shared",
+                "span_type": "llm_call",
+                "status": "success",
+            },
+        ]
+    )
+
+    rows = {
+        row["task_type"]: row.asDict()
+        for row in build_agent_daily_metrics(runs, spans).collect()
+    }
+
+    assert rows["customer_support"]["span_count"] == 1
+    assert rows["customer_support"]["failed_span_count"] == 1
+    assert rows["research"]["span_count"] == 1
+    assert rows["research"]["failed_span_count"] == 0

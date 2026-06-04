@@ -1,14 +1,10 @@
 import pytest
-from pyspark.sql import SparkSession
+
+from scripts.spark_utils import build_spark_session
 
 
 @pytest.fixture
 def spark():
-    session = (
-        SparkSession.builder.appName("test-ai-observability-lakehouse")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
+    session = build_spark_session("test-ai-observability-lakehouse")
     yield session
     session.stop()

@@ -362,7 +362,6 @@ Daily Agent-level metrics for operational dashboards. This table answers:
 | failed_span_count | long | Failed spans |
 | tool_span_count | long | Tool-call spans |
 | llm_span_count | long | LLM-call spans |
-| span_failure_rate | double | failed_span_count / span_count |
 
 ---
 

@@ -130,4 +130,4 @@ The Docker runtime follows the Apache Flink standalone session-cluster pattern:
 
 The local TaskManager uses four slots so the ODS, DWD, and ADS streaming jobs can remain running while batch verification queries read Paimon snapshots.
 
-For the local Flink ADS MVP, `p95_latency_ms` is populated with `MAX(latency_ms)` as a conservative streaming proxy because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate. Spark and ClickHouse remain the better places for exact or approximate percentile reporting.
+For the local Flink ADS MVP, `max_latency_ms` is populated with `MAX(latency_ms)` as an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate. Spark and ClickHouse remain the better places for exact or approximate percentile reporting.

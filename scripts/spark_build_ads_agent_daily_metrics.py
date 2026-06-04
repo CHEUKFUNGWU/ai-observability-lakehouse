@@ -20,6 +20,7 @@ def load_events(spark: SparkSession, input_path: Path) -> DataFrame:
 
 def build_agent_daily_metrics(runs: DataFrame, spans: DataFrame) -> DataFrame:
     keys = ["date", "app_name", "agent_id", "agent_name", "task_type"]
+    run_span_keys = ["date", "agent_id", "run_id"]
 
     run_metrics = runs.groupBy(*keys).agg(
         F.count("*").alias("run_count"),
@@ -35,16 +36,33 @@ def build_agent_daily_metrics(runs: DataFrame, spans: DataFrame) -> DataFrame:
         F.expr("percentile_approx(duration_ms, 0.95)").alias("p95_duration_ms"),
     )
 
-    span_metrics = spans.groupBy("date", "agent_id").agg(
+    run_dimensions = runs.select(*run_span_keys, "app_name", "agent_name", "task_type")
+    spans_with_run_dimensions = spans.join(run_dimensions, on=run_span_keys, how="inner")
+
+    span_metrics = spans_with_run_dimensions.groupBy(*keys).agg(
         F.count("*").alias("span_count"),
         F.sum(F.when(F.col("status") == "error", 1).otherwise(0)).alias("failed_span_count"),
         F.sum(F.when(F.col("span_type") == "tool_call", 1).otherwise(0)).alias("tool_span_count"),
         F.sum(F.when(F.col("span_type") == "llm_call", 1).otherwise(0)).alias("llm_span_count"),
     )
 
-    return run_metrics.join(span_metrics, on=["date", "agent_id"], how="left").withColumn(
-        "span_failure_rate",
-        F.round(F.col("failed_span_count") / F.col("span_count"), 4),
+    return run_metrics.join(span_metrics, on=keys, how="left").select(
+        *keys,
+        "run_count",
+        "success_count",
+        "error_count",
+        "turn_count",
+        "llm_call_count",
+        "tool_call_count",
+        "retrieval_count",
+        "total_tokens",
+        "estimated_cost_usd",
+        "avg_duration_ms",
+        "p95_duration_ms",
+        F.coalesce(F.col("span_count"), F.lit(0)).alias("span_count"),
+        F.coalesce(F.col("failed_span_count"), F.lit(0)).alias("failed_span_count"),
+        F.coalesce(F.col("tool_span_count"), F.lit(0)).alias("tool_span_count"),
+        F.coalesce(F.col("llm_span_count"), F.lit(0)).alias("llm_span_count"),
     )
 
 
