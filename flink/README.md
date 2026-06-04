@@ -1,0 +1,82 @@
+# Flink SQL + Paimon Jobs
+
+This directory contains the first stream-batch SQL assets for the AI observability platform.
+
+## Flow
+
+```text
+Postgres operational source tables
+  -> Flink CDC source tables
+  -> Paimon ODS tables
+  -> Paimon DWD tables
+  -> Paimon ADS tables
+```
+
+## SQL Execution Order
+
+```text
+sql/00_catalogs.sql
+sql/01_source_postgres_cdc.sql
+sql/02_ods_paimon_tables.sql
+sql/03_dwd_paimon_tables.sql
+sql/04_ads_paimon_tables.sql
+sql/10_ingest_ods_from_cdc.sql
+sql/20_build_dwd_from_ods.sql
+sql/30_build_ads_from_dwd.sql
+```
+
+## Local Runtime
+
+Build the Flink image with Paimon and Postgres CDC connectors:
+
+```bash
+docker compose build flink-jobmanager
+```
+
+Start the source database and Flink cluster:
+
+```bash
+docker compose up -d postgres flink-jobmanager flink-taskmanager
+scripts/prepare_flink_warehouse.sh
+```
+
+Load mock LLM events into the Postgres operational source table:
+
+```bash
+uv run python -m scripts.generate_mock_llm_logs --count 100 --seed 42
+scripts/load_llm_jsonl_to_postgres_source.sh data/raw/mock_llm_requests/events.jsonl
+```
+
+Open the Flink Web UI:
+
+```text
+http://localhost:8081
+```
+
+Run one SQL file through the Flink SQL Client:
+
+```bash
+scripts/run_flink_sql_file.sh flink/sql/00_catalogs.sql
+```
+
+The runner starts the dedicated `flink-sql-client` service with `docker compose run --rm`, matching the Apache Flink session-cluster deployment pattern. The JobManager and TaskManager containers remain the long-running cluster; SQL Client is only used to submit SQL statements.
+
+The local TaskManager is configured with four slots so the ODS and DWD streaming jobs can keep running while batch verification queries or ADS builds use the remaining capacity.
+
+The Flink ADS SQL keeps the `p95_latency_ms` column for schema parity, but uses `MAX(latency_ms)` as a conservative local streaming proxy because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate.
+
+Run the SQL files in the order listed above. Long-running `INSERT INTO ... SELECT ...` statements are streaming jobs and should remain visible in the Flink Web UI.
+
+## Runtime Notes
+
+The SQL uses:
+
+- `postgres-cdc` connector for source capture
+- `paimon` catalog for lakehouse tables
+- primary keys on CDC-backed ODS and DWD tables
+- partitioned ADS tables for dashboard-friendly metrics
+
+Connector jars are not vendored in this repository. The local Flink image downloads compatible jars during Docker build:
+
+- `paimon-flink-1.20`
+- `flink-sql-connector-postgres-cdc`

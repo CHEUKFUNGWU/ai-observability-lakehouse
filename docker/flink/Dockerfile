@@ -1,0 +1,23 @@
+ARG FLINK_VERSION=1.20.1
+
+FROM flink:${FLINK_VERSION}-scala_2.12-java17
+
+ARG PAIMON_VERSION=1.2.0
+ARG FLINK_CDC_VERSION=3.2.1
+ARG FLINK_SHADED_HADOOP_VERSION=2.8.3-10.0
+
+USER root
+
+RUN set -eux; \
+    curl -fSL \
+      "https://repo.maven.apache.org/maven2/org/apache/paimon/paimon-flink-1.20/${PAIMON_VERSION}/paimon-flink-1.20-${PAIMON_VERSION}.jar" \
+      -o "/opt/flink/lib/paimon-flink-1.20-${PAIMON_VERSION}.jar"; \
+    curl -fSL \
+      "https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-postgres-cdc/${FLINK_CDC_VERSION}/flink-sql-connector-postgres-cdc-${FLINK_CDC_VERSION}.jar" \
+      -o "/opt/flink/lib/flink-sql-connector-postgres-cdc-${FLINK_CDC_VERSION}.jar"; \
+    curl -fSL \
+      "https://repo.maven.apache.org/maven2/org/apache/flink/flink-shaded-hadoop-2-uber/${FLINK_SHADED_HADOOP_VERSION}/flink-shaded-hadoop-2-uber-${FLINK_SHADED_HADOOP_VERSION}.jar" \
+      -o "/opt/flink/lib/flink-shaded-hadoop-2-uber-${FLINK_SHADED_HADOOP_VERSION}.jar"; \
+    mkdir -p /workspace/data/paimon
+
+USER flink

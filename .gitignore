@@ -1,0 +1,51 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*secret*
+*secrets*
+*credential*
+*credentials*
+
+# Runtime data and generated lakehouse outputs
+data/
+*.parquet
+*.crc
+_SUCCESS
+
+# Flink / Spark generated state
+flink/sql/.generated_sequence.sql
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Local editor and OS files
+.DS_Store
+.vscode/
+.idea/
+
+# Non-project / interview materials
+*interview*
+*Interview*
+*resume*
+*Resume*
+*cv*
+*CV*
+*面试*
+*面試*
+*简历*
+*簡歷*
+*履历*
+*履歷*

@@ -1,0 +1,50 @@
+CREATE TABLE IF NOT EXISTS llm_request_events (
+    request_id TEXT PRIMARY KEY,
+    trace_id TEXT NOT NULL DEFAULT '',
+    run_id TEXT NOT NULL DEFAULT '',
+    span_id TEXT NOT NULL DEFAULT '',
+    agent_id TEXT NOT NULL DEFAULT '',
+    agent_name TEXT NOT NULL DEFAULT '',
+    channel TEXT NOT NULL DEFAULT '',
+    user_id TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL DEFAULT '',
+    app_name TEXT NOT NULL,
+    feature_name TEXT NOT NULL,
+    prompt_category TEXT NOT NULL,
+    prompt_id TEXT NOT NULL,
+    prompt_version TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    prompt_text TEXT NOT NULL,
+    response_text TEXT NOT NULL,
+    prompt_hash TEXT NOT NULL DEFAULT '',
+    response_hash TEXT NOT NULL DEFAULT '',
+    input_chars INTEGER NOT NULL DEFAULT 0,
+    output_chars INTEGER NOT NULL DEFAULT 0,
+    prompt_tokens INTEGER NOT NULL,
+    completion_tokens INTEGER NOT NULL,
+    total_tokens INTEGER NOT NULL,
+    request_type TEXT NOT NULL DEFAULT 'chat',
+    is_streaming BOOLEAN NOT NULL DEFAULT FALSE,
+    temperature DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    max_tokens INTEGER NOT NULL DEFAULT 0,
+    finish_reason TEXT NOT NULL DEFAULT '',
+    retry_count INTEGER NOT NULL DEFAULT 0,
+    latency_ms INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    error_type TEXT,
+    http_status INTEGER NOT NULL,
+    estimated_cost_usd DOUBLE PRECISION NOT NULL,
+    mode TEXT NOT NULL,
+    region TEXT NOT NULL,
+    environment TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    event_date DATE NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_request_events_event_date
+    ON llm_request_events (event_date);
+
+CREATE INDEX IF NOT EXISTS idx_llm_request_events_feature
+    ON llm_request_events (app_name, feature_name, model_name);

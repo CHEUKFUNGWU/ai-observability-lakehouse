@@ -1,0 +1,104 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ai-observability-postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "max_wal_senders=10"
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ai_observability
+      POSTGRES_USER: ai_observability
+      POSTGRES_PASSWORD: ai_observability
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/source_postgres_schema.sql:/docker-entrypoint-initdb.d/01_source_postgres_schema.sql:ro
+
+  flink-jobmanager:
+    build:
+      context: .
+      dockerfile: docker/flink/Dockerfile
+    image: ai-observability-flink:1.20-paimon
+    container_name: ai-observability-flink-jobmanager
+    user: root
+    command: jobmanager
+    ports:
+      - "8081:8081"
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        rest.address: 0.0.0.0
+        parallelism.default: 1
+        execution.checkpointing.interval: 10s
+        execution.checkpointing.mode: EXACTLY_ONCE
+        state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints
+        state.savepoints.dir: file:///workspace/data/paimon/_savepoints
+    volumes:
+      - ./flink:/workspace/flink:ro
+      - paimon_warehouse:/workspace/data/paimon
+    depends_on:
+      - postgres
+
+  flink-taskmanager:
+    image: ai-observability-flink:1.20-paimon
+    container_name: ai-observability-flink-taskmanager
+    user: root
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 1
+        execution.checkpointing.interval: 10s
+        execution.checkpointing.mode: EXACTLY_ONCE
+        state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints
+        state.savepoints.dir: file:///workspace/data/paimon/_savepoints
+    volumes:
+      - ./flink:/workspace/flink:ro
+      - paimon_warehouse:/workspace/data/paimon
+    depends_on:
+      - flink-jobmanager
+
+  flink-sql-client:
+    image: ai-observability-flink:1.20-paimon
+    user: root
+    command: bin/sql-client.sh
+    environment:
+      FLINK_PROPERTIES: |
+        jobmanager.rpc.address: flink-jobmanager
+        rest.address: flink-jobmanager
+        parallelism.default: 1
+        execution.checkpointing.interval: 10s
+        execution.checkpointing.mode: EXACTLY_ONCE
+        state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints
+        state.savepoints.dir: file:///workspace/data/paimon/_savepoints
+    volumes:
+      - ./flink:/workspace/flink:ro
+      - paimon_warehouse:/workspace/data/paimon
+    depends_on:
+      - flink-jobmanager
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.6
+    container_name: ai-observability-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: ai_observability
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./config/clickhouse/users.d/loader.xml:/etc/clickhouse-server/users.d/loader.xml:ro
+  
+volumes:
+  postgres_data:
+  paimon_warehouse:
+  clickhouse_data:

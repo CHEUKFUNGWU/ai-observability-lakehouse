@@ -1,0 +1,18 @@
+[project]
+name = "ai-observability-lakehouse-docs"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "clickhouse-connect>=1.1.1",
+    "openai>=2.40.0",
+    "pyarrow>=24.0.0",
+    "pyspark>=4.1.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
