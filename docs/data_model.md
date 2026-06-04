@@ -321,8 +321,6 @@ Daily feature-level LLM metrics for dashboard queries and ClickHouse loading.
 | estimated_cost_usd | double | Total estimated cost |
 | avg_latency_ms | double | Average latency |
 | p95_latency_ms | long | Approximate p95 latency |
-| success_rate | double | success_count / request_count |
-| error_rate | double | error_count / request_count |
 
 ---
 
@@ -366,8 +364,6 @@ Daily Agent-level metrics for operational dashboards. This table answers:
 | failed_span_count | long | Failed spans |
 | tool_span_count | long | Tool-call spans |
 | llm_span_count | long | LLM-call spans |
-| success_rate | double | success_count / run_count |
-| error_rate | double | error_count / run_count |
 | span_failure_rate | double | failed_span_count / span_count |
 
 ---
@@ -404,8 +400,6 @@ Daily tool-level Agent metrics for dashboard queries. This table answers:
 | p95_duration_ms | long | Approximate p95 tool call duration |
 | avg_result_size | double | Average result payload size |
 | max_result_size | int | Max result payload size |
-| success_rate | double | success_count / tool_call_count |
-| error_rate | double | error_count / tool_call_count |
 
 ---
 

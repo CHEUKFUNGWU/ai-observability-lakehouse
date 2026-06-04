@@ -64,11 +64,10 @@ ORDER BY error_rate DESC, request_count DESC;
 -- 5. Latency by feature.
 SELECT
     feature_name,
-    round(sum(avg_latency_ms * request_count) / sum(request_count), 2) AS weighted_avg_latency_ms,
-    max(p95_latency_ms) AS max_p95_latency_ms
+    round(sum(avg_latency_ms * request_count) / sum(request_count), 2) AS weighted_avg_latency_ms
 FROM ai_observability.ads_llm_feature_daily_metrics
 GROUP BY feature_name
-ORDER BY max_p95_latency_ms DESC;
+ORDER BY weighted_avg_latency_ms DESC;
 
 -- 6. Cost and usage by model.
 SELECT

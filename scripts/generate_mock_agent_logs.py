@@ -5,12 +5,15 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.agent_event import AgentRunEvent, AgentSpanEvent
+from app.logging_utils import get_logger, log_info
 from app.llm_event import text_sha256
+from app.model_pricing import DEFAULT_MODEL_NAME, estimate_model_cost_usd
 
 
 DEFAULT_RUN_OUTPUT_PATH = Path("data/raw/mock_agent_runs/events.jsonl")
 DEFAULT_SPAN_OUTPUT_PATH = Path("data/raw/mock_agent_spans/events.jsonl")
 DEFAULT_START_TIME = "2026-01-01T00:00:00+00:00"
+LOGGER = get_logger(__name__)
 
 AGENTS = [
     ("agent_support", "customer_support_agent", "customer_support"),
@@ -53,14 +56,14 @@ def build_agent_events(
         duration_ms = random.randint(80, 2500)
         span_status = status if span_order == span_count else "success"
         span_error_type = error_type if span_status == "error" else None
-        model_name = "deepseek-chat" if span_type == "llm_call" else None
+        model_name = DEFAULT_MODEL_NAME if span_type == "llm_call" else None
         tool_name = random.choice(["order_lookup", "ticket_create", "crm_search"]) if span_type == "tool_call" else None
 
         if span_type == "llm_call":
             llm_call_count += 1
             span_tokens = random.randint(200, 2000)
             total_tokens += span_tokens
-            estimated_cost_usd += round(span_tokens / 1_000_000 * 0.28, 8)
+            estimated_cost_usd += estimate_model_cost_usd(model_name or DEFAULT_MODEL_NAME, 0, span_tokens)
         elif span_type == "tool_call":
             tool_call_count += 1
         elif span_type == "retrieval":
@@ -177,8 +180,8 @@ def main() -> None:
         seed=args.seed,
         start_time=datetime.fromisoformat(args.start_time),
     )
-    print(f"Wrote {run_count} agent runs to {args.run_output}")
-    print(f"Wrote {span_count} agent spans to {args.span_output}")
+    log_info(LOGGER, "mock_agent_runs_written", output=str(args.run_output), rows=run_count)
+    log_info(LOGGER, "mock_agent_spans_written", output=str(args.span_output), rows=span_count)
 
 
 if __name__ == "__main__":

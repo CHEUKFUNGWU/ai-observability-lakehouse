@@ -1,24 +1,16 @@
 import argparse
-import os
 from pathlib import Path
-
-os.environ.pop("SPARK_HOME", None)
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from app.logging_utils import get_logger, log_info
+from scripts.spark_utils import build_spark_session
+
 
 DEFAULT_INPUT_PATH = Path("data/raw/mock_llm_requests/events.jsonl")
 DEFAULT_OUTPUT_PATH = Path("data/warehouse/ods/llm_request/events.parquet")
-
-
-def build_spark_session() -> SparkSession:
-    return (
-        SparkSession.builder.appName("ai-observability-ods-llm-events")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
+LOGGER = get_logger(__name__)
 
 
 def load_source_events(spark: SparkSession, input_path: Path) -> DataFrame:
@@ -45,12 +37,12 @@ def main() -> None:
     parser.add_argument("--source-name", type=str, default="mock_llm_generator")
     args = parser.parse_args()
 
-    spark = build_spark_session()
+    spark = build_spark_session("ai-observability-ods-llm-events")
     try:
         raw_events = load_source_events(spark, args.input)
         ods_events = build_ods_llm_events(raw_events, args.source_name)
         write_ods_events(ods_events, args.output)
-        print(f"Built ODS LLM events: {args.output} ({ods_events.count()} rows)")
+        log_info(LOGGER, "ods_llm_events_written", output=str(args.output), rows=ods_events.count())
     finally:
         spark.stop()
 

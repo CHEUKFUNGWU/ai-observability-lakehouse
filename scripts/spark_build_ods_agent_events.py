@@ -1,26 +1,18 @@
 import argparse
-import os
 from pathlib import Path
-
-os.environ.pop("SPARK_HOME", None)
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+
+from app.logging_utils import get_logger, log_info
+from scripts.spark_utils import build_spark_session
 
 
 DEFAULT_RUN_INPUT_PATH = Path("data/raw/mock_agent_runs/events.jsonl")
 DEFAULT_SPAN_INPUT_PATH = Path("data/raw/mock_agent_spans/events.jsonl")
 DEFAULT_RUN_OUTPUT_PATH = Path("data/warehouse/ods/agent_run/events.parquet")
 DEFAULT_SPAN_OUTPUT_PATH = Path("data/warehouse/ods/agent_span/events.parquet")
-
-
-def build_spark_session() -> SparkSession:
-    return (
-        SparkSession.builder.appName("ai-observability-ods-agent-events")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
+LOGGER = get_logger(__name__)
 
 
 def load_source_events(spark: SparkSession, input_path: Path) -> DataFrame:
@@ -53,7 +45,7 @@ def main() -> None:
     parser.add_argument("--source-name", type=str, default="mock_agent_generator")
     args = parser.parse_args()
 
-    spark = build_spark_session()
+    spark = build_spark_session("ai-observability-ods-agent-events")
     try:
         raw_runs = load_source_events(spark, args.run_input)
         raw_spans = load_source_events(spark, args.span_input)
@@ -64,8 +56,8 @@ def main() -> None:
         write_ods_events(ods_runs, args.run_output)
         write_ods_events(ods_spans, args.span_output)
 
-        print(f"Built ODS agent runs: {args.run_output} ({ods_runs.count()} rows)")
-        print(f"Built ODS agent spans: {args.span_output} ({ods_spans.count()} rows)")
+        log_info(LOGGER, "ods_agent_runs_written", output=str(args.run_output), rows=ods_runs.count())
+        log_info(LOGGER, "ods_agent_spans_written", output=str(args.span_output), rows=ods_spans.count())
     finally:
         spark.stop()
 

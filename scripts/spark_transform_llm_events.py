@@ -1,24 +1,16 @@
 import argparse
-import os
 from pathlib import Path
-
-os.environ.pop("SPARK_HOME", None)
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
-
-def build_spark_session() -> SparkSession:
-    return (
-        SparkSession.builder.appName("ai-observability-llm-events-batch")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
+from app.logging_utils import get_logger, log_info
+from scripts.spark_utils import build_spark_session
 
 
 DEFAULT_INPUT_PATH = Path("data/warehouse/ods/llm_request/events.parquet")
 DEFAULT_OUTPUT_PATH = Path("data/warehouse/llm_request/events.parquet")
+LOGGER = get_logger(__name__)
 
 
 def load_ods_events(spark: SparkSession, input_path: Path) -> DataFrame:
@@ -93,15 +85,19 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--show-sample", action="store_true")
     args = parser.parse_args()
-    spark = build_spark_session()
+    spark = build_spark_session("ai-observability-llm-events-batch")
 
     try:
         ods_events = load_ods_events(spark, args.input)
         events = transform_llm_events(ods_events)
         invalid_token_total_count = count_invalid_token_totals(events)
 
-        print(f"Rows: {events.count()}")
-        print(f"Invalid token totals: {invalid_token_total_count}")
+        log_info(
+            LOGGER,
+            "dwd_llm_events_validated",
+            rows=events.count(),
+            invalid_token_totals=invalid_token_total_count,
+        )
 
         if args.show_sample:
             events.printSchema()
@@ -111,10 +107,10 @@ def main() -> None:
             raise ValueError("Found rows where total_tokens != prompt_tokens + completion_tokens")
 
         write_parquet(events, args.output)
-        print(f"Wrote parquet to {args.output}")
+        log_info(LOGGER, "dwd_llm_events_written", output=str(args.output))
 
         written_events = spark.read.parquet(str(args.output))
-        print(f"Read back rows: {written_events.count()}")
+        log_info(LOGGER, "dwd_llm_events_verified", rows=written_events.count())
 
     finally:
         spark.stop()

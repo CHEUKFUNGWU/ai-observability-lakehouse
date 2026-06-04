@@ -6,12 +6,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+from app.logging_utils import get_logger, log_info
 from app.deepseek_client import (
     DEFAULT_DEEPSEEK_MODEL,
     DeepSeekCallResult,
     call_deepseek_chat,
 )
 from app.llm_event import LLMRequestEvent, text_sha256
+from app.model_pricing import estimate_model_cost_usd
 
 
 DEFAULT_OUTPUT_PATH = Path("data/raw/live_llm_requests/deepseek_events.jsonl")
@@ -20,14 +22,7 @@ DEFAULT_FEATURE_NAME = "live_chat"
 DEFAULT_PROMPT_CATEGORY = "demo"
 DEFAULT_REGION = "unknown"
 DEFAULT_ENVIRONMENT = "dev"
-
-def estimate_cost_usd(prompt_tokens: int, completion_tokens: int) -> float:
-    input_price_per_1m = 0.14
-    output_price_per_1m = 0.28
-
-    input_cost = prompt_tokens / 1_000_000 * input_price_per_1m
-    output_cost = completion_tokens / 1_000_000 * output_price_per_1m
-    return round(input_cost + output_cost, 8)
+LOGGER = get_logger(__name__)
 
 
 def build_live_event(
@@ -79,7 +74,8 @@ def build_live_event(
         status="success",
         error_type=None,
         http_status=result.http_status,
-        estimated_cost_usd=estimate_cost_usd(
+        estimated_cost_usd=estimate_model_cost_usd(
+            result.model_name,
             result.prompt_tokens,
             result.completion_tokens,
         ),
@@ -168,7 +164,7 @@ def build_error_event(
 def write_events(events: list[LLMRequestEvent], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with output_path.open("w", encoding="utf-8") as file:
+    with output_path.open("a", encoding="utf-8") as file:
         for event in events:
             file.write(json.dumps(event.to_dict()) + "\n")
 
@@ -223,12 +219,12 @@ def main() -> None:
                 max_tokens=args.max_tokens,
                 temperature=args.temperature,
             )
-            print(f"Captured error event for {prompt_id}: {event.error_type}")
+            log_info(LOGGER, "deepseek_error_event_captured", prompt_id=prompt_id, error_type=event.error_type)
 
         events.append(event)
 
     write_events(events, args.output)
-    print(f"Wrote {len(events)} live events to {args.output}")
+    log_info(LOGGER, "deepseek_live_events_written", count=len(events), output=str(args.output))
 
 
 if __name__ == "__main__":

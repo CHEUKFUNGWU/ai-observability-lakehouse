@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from app.agent_event import AgentRunEvent, AgentSpanEvent, AgentToolCallEvent
+from app.logging_utils import get_logger, log_info
 from app.llm_event import text_sha256
 
 
@@ -12,6 +13,7 @@ DEFAULT_INPUT_PATH = Path("data/raw/hermes_trajectories/trajectories.jsonl")
 DEFAULT_RUN_OUTPUT_PATH = Path("data/raw/hermes_agent_runs/events.jsonl")
 DEFAULT_SPAN_OUTPUT_PATH = Path("data/raw/hermes_agent_spans/events.jsonl")
 DEFAULT_TOOL_CALL_OUTPUT_PATH = Path("data/raw/hermes_agent_tool_calls/events.jsonl")
+LOGGER = get_logger(__name__)
 
 
 def parse_timestamp(value: str | None) -> datetime:
@@ -302,9 +304,9 @@ def main() -> None:
         span_output_path=args.span_output,
         tool_call_output_path=args.tool_call_output,
     )
-    print(f"Parsed Hermes runs: {args.run_output} ({run_count} rows)")
-    print(f"Parsed Hermes spans: {args.span_output} ({span_count} rows)")
-    print(f"Parsed Hermes tool calls: {args.tool_call_output} ({tool_call_count} rows)")
+    log_info(LOGGER, "hermes_runs_parsed", output=str(args.run_output), rows=run_count)
+    log_info(LOGGER, "hermes_spans_parsed", output=str(args.span_output), rows=span_count)
+    log_info(LOGGER, "hermes_tool_calls_parsed", output=str(args.tool_call_output), rows=tool_call_count)
 
 
 if __name__ == "__main__":

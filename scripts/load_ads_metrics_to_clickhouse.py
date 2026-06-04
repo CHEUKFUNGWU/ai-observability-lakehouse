@@ -5,10 +5,13 @@ from pathlib import Path
 import clickhouse_connect
 import pyarrow.parquet as pq
 
+from app.logging_utils import get_logger, log_info
+
 DEFAULT_INPUT_PATH = Path("data/warehouse/ads/llm_feature_daily_metrics.parquet")
 DEFAULT_TABLE_NAME = "ads_llm_feature_daily_metrics"
 DEFAULT_DATABASE = "ai_observability"
 DEFAULT_USER = "loader"
+LOGGER = get_logger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
@@ -73,8 +76,6 @@ def load_rows_to_clickhouse(
         "estimated_cost_usd",
         "avg_latency_ms",
         "p95_latency_ms",
-        "success_rate",
-        "error_rate",
     ]
 
     data = [[row[column] for column in columns] for row in rows]
@@ -100,9 +101,8 @@ def main() -> None:
         password=args.password,
     )
 
-    print(f"Loaded {len(rows)} rows into {args.database}.{args.table}")
+    log_info(LOGGER, "clickhouse_ads_metrics_loaded", rows=len(rows), database=args.database, table=args.table)
 
 
 if __name__ == "__main__":
     main()
-

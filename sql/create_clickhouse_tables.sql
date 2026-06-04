@@ -16,9 +16,7 @@ CREATE TABLE IF NOT EXISTS ai_observability.ads_llm_feature_daily_metrics
     total_tokens UInt64,
     estimated_cost_usd Float64,
     avg_latency_ms Float64,
-    p95_latency_ms UInt64,
-    success_rate Float64,
-    error_rate Float64
+    p95_latency_ms UInt64
 )
 
 ENGINE = MergeTree

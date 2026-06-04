@@ -4,8 +4,9 @@ import random
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-
+from app.logging_utils import get_logger, log_info
 from app.llm_event import LLMRequestEvent, text_sha256
+from app.model_pricing import available_model_names, estimate_model_cost_usd
 
 OUTPUT_PATH = Path("data/raw/mock_llm_requests/events.jsonl")
 
@@ -13,14 +14,9 @@ APPS = ["ai_support_bot", "sales_assistant", "internal_copilot"]
 FEATURES = ["chat", "summary", "rewrite", "rag_answer"]
 PROMPT_CATEGORIES = ["support", "sales", "productivity", "knowledge_base"]
 REGIONS = ["us", "eu", "apac"]
+MODEL_NAMES = available_model_names()
+LOGGER = get_logger(__name__)
 
-def estimate_cost_usd(prompt_tokens: int, completion_tokens: int) -> float:
-    input_price_per_1m = 0.14
-    output_price_per_1m = 0.28
-
-    input_cost = prompt_tokens / 1_000_000 * input_price_per_1m
-    output_cost = completion_tokens / 1_000_000 * output_price_per_1m
-    return round(input_cost + output_cost, 8)
 
 def build_mock_event(created_at: datetime | None = None) -> LLMRequestEvent:
     prompt_tokens = random.randint(20, 800)
@@ -33,6 +29,7 @@ def build_mock_event(created_at: datetime | None = None) -> LLMRequestEvent:
     http_status = 200 if is_success else random.choice([429, 500, 503])
     prompt_text = "mock user prompt"
     response_text = "mock model response" if is_success else ""
+    model_name = random.choice(MODEL_NAMES)
 
     if created_at is None:
         created_at = datetime.now(timezone.utc)
@@ -53,7 +50,7 @@ def build_mock_event(created_at: datetime | None = None) -> LLMRequestEvent:
         prompt_category=random.choice(PROMPT_CATEGORIES),
         prompt_id=f"prompt_{random.randint(1, 50):03d}",
         prompt_version=random.choice(["v1", "v2", "v3"]),
-        model_name="deepseek-chat",
+        model_name=model_name,
         provider="deepseek",
         prompt_text=prompt_text,
         response_text=response_text,
@@ -74,7 +71,11 @@ def build_mock_event(created_at: datetime | None = None) -> LLMRequestEvent:
         status=status,
         error_type=error_type,
         http_status=http_status,
-        estimated_cost_usd=estimate_cost_usd(prompt_tokens, completion_tokens if is_success else 0),
+        estimated_cost_usd=estimate_model_cost_usd(
+            model_name,
+            prompt_tokens,
+            completion_tokens if is_success else 0,
+        ),
         mode="mock",
         region=random.choice(REGIONS),
         environment="dev",
@@ -114,7 +115,7 @@ def main() -> None:
     )
 
     write_jsonl(args.count, args.output, seed=args.seed, start_time=start_time)
-    print(f"Wrote {args.count} events to {args.output}")
+    log_info(LOGGER, "mock_llm_events_written", count=args.count, output=str(args.output))
 
 if __name__ == "__main__":
     main()

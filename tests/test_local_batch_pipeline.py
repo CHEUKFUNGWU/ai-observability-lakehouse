@@ -2,6 +2,7 @@ from datetime import datetime
 
 from scripts.run_local_batch_pipeline import DEFAULT_START_TIME, build_ads, build_dwd, build_ods
 from scripts.generate_mock_llm_logs import write_jsonl
+from scripts.spark_utils import build_spark_session
 
 
 def test_pipeline_raw_generation_writes_expected_rows(tmp_path):
@@ -30,9 +31,13 @@ def test_pipeline_builds_dwd_and_ads(tmp_path):
         start_time=datetime.fromisoformat(DEFAULT_START_TIME),
     )
 
-    ods_rows = build_ods(raw_output, ods_output)
-    dwd_rows = build_dwd(ods_output, dwd_output)
-    ads_rows = build_ads(dwd_output, ads_output)
+    spark = build_spark_session("test-local-batch-pipeline")
+    try:
+        ods_rows = build_ods(spark, raw_output, ods_output)
+        dwd_rows = build_dwd(spark, ods_output, dwd_output)
+        ads_rows = build_ads(spark, dwd_output, ads_output)
+    finally:
+        spark.stop()
 
     assert ods_rows == 5
     assert dwd_rows == 5

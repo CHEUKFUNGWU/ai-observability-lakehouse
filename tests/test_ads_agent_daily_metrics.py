@@ -82,5 +82,6 @@ def test_build_agent_daily_metrics_aggregates_runs_and_spans(spark):
     assert row["p95_duration_ms"] == 300
     assert row["span_count"] == 2
     assert row["failed_span_count"] == 1
-    assert row["success_rate"] == 0.5
+    assert "success_rate" not in row.asDict()
+    assert "error_rate" not in row.asDict()
     assert row["span_failure_rate"] == 0.5

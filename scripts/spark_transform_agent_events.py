@@ -1,26 +1,18 @@
 import argparse
-import os
 from pathlib import Path
-
-os.environ.pop("SPARK_HOME", None)
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+
+from app.logging_utils import get_logger, log_info
+from scripts.spark_utils import build_spark_session
 
 
 DEFAULT_RUN_INPUT_PATH = Path("data/warehouse/ods/agent_run/events.parquet")
 DEFAULT_SPAN_INPUT_PATH = Path("data/warehouse/ods/agent_span/events.parquet")
 DEFAULT_RUN_OUTPUT_PATH = Path("data/warehouse/agent_run/events.parquet")
 DEFAULT_SPAN_OUTPUT_PATH = Path("data/warehouse/agent_span/events.parquet")
-
-
-def build_spark_session() -> SparkSession:
-    return (
-        SparkSession.builder.appName("ai-observability-agent-events-batch")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
+LOGGER = get_logger(__name__)
 
 
 def load_ods_events(spark: SparkSession, input_path: Path) -> DataFrame:
@@ -107,14 +99,14 @@ def main() -> None:
     parser.add_argument("--span-output", type=Path, default=DEFAULT_SPAN_OUTPUT_PATH)
     args = parser.parse_args()
 
-    spark = build_spark_session()
+    spark = build_spark_session("ai-observability-agent-events-batch")
     try:
         runs = transform_agent_run_events(load_ods_events(spark, args.run_input))
         spans = transform_agent_span_events(load_ods_events(spark, args.span_input))
         write_parquet(runs, args.run_output)
         write_parquet(spans, args.span_output)
-        print(f"Built DWD agent runs: {args.run_output} ({runs.count()} rows)")
-        print(f"Built DWD agent spans: {args.span_output} ({spans.count()} rows)")
+        log_info(LOGGER, "dwd_agent_runs_written", output=str(args.run_output), rows=runs.count())
+        log_info(LOGGER, "dwd_agent_spans_written", output=str(args.span_output), rows=spans.count())
     finally:
         spark.stop()
 

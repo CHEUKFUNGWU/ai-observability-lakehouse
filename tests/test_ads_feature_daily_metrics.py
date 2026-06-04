@@ -116,7 +116,7 @@ def test_build_feature_daily_metrics_groups_by_daily_feature_model(spark):
     assert metrics.count() == 2
 
 
-def test_build_feature_daily_metrics_aggregates_counts_and_rates(spark):
+def test_build_feature_daily_metrics_aggregates_counts(spark):
     events = make_dwd_events(spark)
 
     rows = {
@@ -129,8 +129,8 @@ def test_build_feature_daily_metrics_aggregates_counts_and_rates(spark):
     assert chat["request_count"] == 2
     assert chat["success_count"] == 1
     assert chat["error_count"] == 1
-    assert chat["success_rate"] == 0.5
-    assert chat["error_rate"] == 0.5
+    assert "success_rate" not in chat.asDict()
+    assert "error_rate" not in chat.asDict()
 
 
 def test_build_feature_daily_metrics_aggregates_tokens_and_cost(spark):

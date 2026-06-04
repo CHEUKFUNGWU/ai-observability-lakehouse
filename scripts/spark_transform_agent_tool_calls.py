@@ -1,24 +1,16 @@
 import argparse
-import os
 from pathlib import Path
-
-os.environ.pop("SPARK_HOME", None)
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from app.logging_utils import get_logger, log_info
+from scripts.spark_utils import build_spark_session
+
 
 DEFAULT_INPUT_PATH = Path("data/warehouse/ods/agent_tool_call/events.parquet")
 DEFAULT_OUTPUT_PATH = Path("data/warehouse/agent_tool_call/events.parquet")
-
-
-def build_spark_session() -> SparkSession:
-    return (
-        SparkSession.builder.appName("ai-observability-agent-tool-calls-batch")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
+LOGGER = get_logger(__name__)
 
 
 def load_ods_events(spark: SparkSession, input_path: Path) -> DataFrame:
@@ -59,11 +51,11 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     args = parser.parse_args()
 
-    spark = build_spark_session()
+    spark = build_spark_session("ai-observability-agent-tool-calls-batch")
     try:
         tool_calls = transform_agent_tool_call_events(load_ods_events(spark, args.input))
         write_parquet(tool_calls, args.output)
-        print(f"Built DWD agent tool calls: {args.output} ({tool_calls.count()} rows)")
+        log_info(LOGGER, "dwd_agent_tool_calls_written", output=str(args.output), rows=tool_calls.count())
     finally:
         spark.stop()
 

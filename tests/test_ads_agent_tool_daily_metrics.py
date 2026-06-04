@@ -68,10 +68,10 @@ def test_build_agent_tool_daily_metrics_aggregates_by_agent_and_tool(spark):
     assert order_lookup["p95_duration_ms"] == 300
     assert order_lookup["avg_result_size"] == 125.0
     assert order_lookup["max_result_size"] == 200
-    assert order_lookup["success_rate"] == 0.5
-    assert order_lookup["error_rate"] == 0.5
+    assert "success_rate" not in order_lookup
+    assert "error_rate" not in order_lookup
 
     crm_search = rows["crm_search"]
     assert crm_search["tool_call_count"] == 1
-    assert crm_search["success_rate"] == 1.0
-    assert crm_search["error_rate"] == 0.0
+    assert crm_search["success_count"] == 1
+    assert crm_search["error_count"] == 0

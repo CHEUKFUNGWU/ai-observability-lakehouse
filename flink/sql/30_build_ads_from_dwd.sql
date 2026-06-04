@@ -17,8 +17,6 @@ SELECT
     -- Flink 1.20 SQL does not support PERCENTILE_CONT as a streaming aggregate.
     -- Keep the metric column as a conservative latency upper-bound for the local
     -- stream-batch MVP; Spark/ClickHouse can compute exact or approximate p95.
-    CAST(MAX(latency_ms) AS DOUBLE) AS p95_latency_ms,
-    CAST(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) AS success_rate,
-    CAST(SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) AS error_rate
+    CAST(MAX(latency_ms) AS DOUBLE) AS p95_latency_ms
 FROM paimon_lake.dwd.llm_request_events
 GROUP BY event_date, app_name, feature_name, model_name;
