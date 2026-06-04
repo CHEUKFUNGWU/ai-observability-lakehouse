@@ -41,8 +41,6 @@ def transform_llm_events(raw_events: DataFrame) -> DataFrame:
         F.col("prompt_version").cast("string").alias("prompt_version"),
         F.col("model_name").cast("string").alias("model_name"),
         F.col("provider").cast("string").alias("provider"),
-        F.col("prompt_text").cast("string").alias("prompt_text"),
-        F.col("response_text").cast("string").alias("response_text"),
         event_col("prompt_hash", "").cast("string").alias("prompt_hash"),
         event_col("response_hash", "").cast("string").alias("response_hash"),
         event_col("input_chars", 0).cast("int").alias("input_chars"),

@@ -78,7 +78,7 @@ One row per source event.
 
 ### Business Meaning
 
-Each row represents one LLM API request. This table is the source of truth for model usage, latency, token cost, API reliability and prompt/response metadata.
+Each row represents one LLM API request. This table is the source of truth for model usage, latency, token cost, API reliability and prompt/response metadata. Raw prompt and response text stay in ODS/source data; DWD keeps hashes and length fields for safer analytics.
 
 When the request is produced by an Agent, it can be linked to `agent_run_events` and `agent_span_events` through `run_id` and `span_id`.
 
@@ -103,8 +103,6 @@ When the request is produced by an Agent, it can be linked to `agent_run_events`
 | prompt_version | string | Prompt version |
 | model_name | string | LLM model name |
 | provider | string | API provider, e.g. deepseek |
-| prompt_text | string | User prompt or input text |
-| response_text | string | Model response text |
 | prompt_hash | string | Hash of prompt text for safer deduplication |
 | response_hash | string | Hash of response text |
 | input_chars | int | Prompt character count |
