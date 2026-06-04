@@ -35,17 +35,3 @@ derby.log
 .DS_Store
 .vscode/
 .idea/
-
-# Non-project / interview materials
-*interview*
-*Interview*
-*resume*
-*Resume*
-*cv*
-*CV*
-*面试*
-*面試*
-*简历*
-*簡歷*
-*履历*
-*履歷*
