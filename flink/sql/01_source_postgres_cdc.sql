@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS src_llm_request_events (
     region STRING,
     environment STRING,
     created_at TIMESTAMP(3),
-    event_date DATE,
+    `date` DATE,
     PRIMARY KEY (request_id) NOT ENFORCED
 ) WITH (
     'connector' = 'postgres-cdc',

@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS paimon_lake.ods.llm_request_events (
     region STRING,
     environment STRING,
     created_at TIMESTAMP(3),
-    event_date DATE,
+    `date` DATE,
     source_name STRING,
     source_event_type STRING,
     ingested_at TIMESTAMP(3),

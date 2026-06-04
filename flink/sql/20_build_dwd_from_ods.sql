@@ -43,6 +43,6 @@ SELECT
     region,
     environment,
     created_at,
-    event_date
+    `date`
 FROM paimon_lake.ods.llm_request_events
 WHERE total_tokens = prompt_tokens + completion_tokens;

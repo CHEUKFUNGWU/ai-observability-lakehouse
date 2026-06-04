@@ -40,11 +40,11 @@ CREATE TABLE IF NOT EXISTS llm_request_events (
     region TEXT NOT NULL,
     environment TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL,
-    event_date DATE NOT NULL
+    date DATE NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_llm_request_events_event_date
-    ON llm_request_events (event_date);
+CREATE INDEX IF NOT EXISTS idx_llm_request_events_date
+    ON llm_request_events (date);
 
 CREATE INDEX IF NOT EXISTS idx_llm_request_events_feature
     ON llm_request_events (app_name, feature_name, model_name);

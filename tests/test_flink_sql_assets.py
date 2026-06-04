@@ -61,7 +61,7 @@ def test_paimon_layers_use_expected_tables():
     assert "paimon_lake.ads.llm_feature_daily_metrics" in ads_sql
     assert "source_name STRING" in ods_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in dwd_sql
-    assert "PARTITIONED BY (event_date)" in ads_sql
+    assert "PARTITIONED BY (`date`)" in ads_sql
 
 
 def test_flink_sql_layer_dependencies_are_explicit():
@@ -107,8 +107,8 @@ def test_postgres_source_schema_matches_cdc_source_table():
 
     assert "CREATE TABLE IF NOT EXISTS llm_request_events" in postgres_sql
     assert "request_id TEXT PRIMARY KEY" in postgres_sql
-    assert "event_date DATE NOT NULL" in postgres_sql
-    assert "idx_llm_request_events_event_date" in postgres_sql
+    assert "date DATE NOT NULL" in postgres_sql
+    assert "idx_llm_request_events_date" in postgres_sql
 
 
 def test_flink_dockerfile_installs_paimon_and_postgres_cdc_connectors():
@@ -179,4 +179,4 @@ def test_postgres_source_loader_uses_copy_from_exporter():
     assert "scripts.export_llm_jsonl_to_postgres_copy" in script
     assert "docker compose exec -T postgres" in script
     assert "\\copy llm_request_events" in script
-    assert "event_date" in script
+    assert "created_at,date" in script

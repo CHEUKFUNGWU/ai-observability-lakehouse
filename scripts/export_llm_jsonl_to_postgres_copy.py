@@ -48,7 +48,7 @@ COPY_COLUMNS = [
     "region",
     "environment",
     "created_at",
-    "event_date",
+    "date",
 ]
 
 
@@ -84,8 +84,7 @@ def normalize_value(value: Any) -> str:
 def row_from_event(event: dict) -> list[str]:
     row = []
     for column in COPY_COLUMNS:
-        source_key = "date" if column == "event_date" else column
-        value = event.get(source_key, DEFAULTS.get(column))
+        value = event.get(column, DEFAULTS.get(column))
         row.append(normalize_value(value))
     return row
 

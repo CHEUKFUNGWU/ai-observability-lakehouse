@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS paimon_lake.dwd.llm_request_events (
     region STRING,
     environment STRING,
     created_at TIMESTAMP(3),
-    event_date DATE,
+    `date` DATE,
     PRIMARY KEY (request_id) NOT ENFORCED
 ) WITH (
     'bucket' = '4'

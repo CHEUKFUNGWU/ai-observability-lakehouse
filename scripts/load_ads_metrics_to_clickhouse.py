@@ -1,4 +1,5 @@
 import argparse
+import re
 from datetime import date
 from pathlib import Path
 
@@ -12,6 +13,7 @@ DEFAULT_TABLE_NAME = "ads_llm_feature_daily_metrics"
 DEFAULT_DATABASE = "ai_observability"
 DEFAULT_USER = "loader"
 LOGGER = get_logger(__name__)
+IDENTIFIER_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,6 +42,18 @@ def normalize_row(row: dict) -> dict:
     return normalized
 
 
+def validate_clickhouse_identifier(identifier: str) -> str:
+    if not IDENTIFIER_PATTERN.fullmatch(identifier):
+        raise ValueError(f"Invalid ClickHouse identifier: {identifier!r}")
+    return identifier
+
+
+def qualified_table_name(database: str, table: str) -> str:
+    safe_database = validate_clickhouse_identifier(database)
+    safe_table = validate_clickhouse_identifier(table)
+    return f"{safe_database}.{safe_table}"
+
+
 def load_rows_to_clickhouse(
     rows: list[dict],
     database: str,
@@ -57,7 +71,9 @@ def load_rows_to_clickhouse(
         database=database,
     )
 
-    client.command(f"TRUNCATE TABLE {database}.{table}")
+    table_name = qualified_table_name(database, table)
+
+    client.command(f"TRUNCATE TABLE {table_name}")
 
     if not rows:
         return
@@ -81,7 +97,7 @@ def load_rows_to_clickhouse(
     data = [[row[column] for column in columns] for row in rows]
 
     client.insert(
-        table=f"{database}.{table}",
+        table=table_name,
         data=data,
         column_names=columns,
     )

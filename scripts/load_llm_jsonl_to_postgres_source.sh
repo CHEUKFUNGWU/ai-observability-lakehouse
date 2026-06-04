@@ -7,7 +7,7 @@ if [[ $# -ne 1 ]]; then
 fi
 
 input_path="$1"
-copy_columns="request_id,trace_id,run_id,span_id,agent_id,agent_name,channel,user_id,session_id,conversation_id,app_name,feature_name,prompt_category,prompt_id,prompt_version,model_name,provider,prompt_text,response_text,prompt_hash,response_hash,input_chars,output_chars,prompt_tokens,completion_tokens,total_tokens,request_type,is_streaming,temperature,max_tokens,finish_reason,retry_count,latency_ms,status,error_type,http_status,estimated_cost_usd,mode,region,environment,created_at,event_date"
+copy_columns="request_id,trace_id,run_id,span_id,agent_id,agent_name,channel,user_id,session_id,conversation_id,app_name,feature_name,prompt_category,prompt_id,prompt_version,model_name,provider,prompt_text,response_text,prompt_hash,response_hash,input_chars,output_chars,prompt_tokens,completion_tokens,total_tokens,request_type,is_streaming,temperature,max_tokens,finish_reason,retry_count,latency_ms,status,error_type,http_status,estimated_cost_usd,mode,region,environment,created_at,date"
 
 uv run python -m scripts.export_llm_jsonl_to_postgres_copy --input "${input_path}" \
   | docker compose exec -T postgres \

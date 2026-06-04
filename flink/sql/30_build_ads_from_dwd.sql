@@ -2,7 +2,7 @@
 
 INSERT INTO paimon_lake.ads.llm_feature_daily_metrics
 SELECT
-    event_date,
+    `date`,
     app_name,
     feature_name,
     model_name,
@@ -19,4 +19,4 @@ SELECT
     -- stream-batch MVP; Spark/ClickHouse can compute exact or approximate p95.
     CAST(MAX(latency_ms) AS DOUBLE) AS p95_latency_ms
 FROM paimon_lake.dwd.llm_request_events
-GROUP BY event_date, app_name, feature_name, model_name;
+GROUP BY `date`, app_name, feature_name, model_name;

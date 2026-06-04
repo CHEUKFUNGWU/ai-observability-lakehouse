@@ -5,7 +5,7 @@ from io import StringIO
 from scripts.export_llm_jsonl_to_postgres_copy import COPY_COLUMNS, export_copy_rows
 
 
-def test_export_llm_jsonl_to_postgres_copy_maps_date_to_event_date(tmp_path):
+def test_export_llm_jsonl_to_postgres_copy_keeps_date_column(tmp_path):
     input_path = tmp_path / "events.jsonl"
     event = {
         "request_id": "req_001",
@@ -43,7 +43,7 @@ def test_export_llm_jsonl_to_postgres_copy_maps_date_to_event_date(tmp_path):
 
     assert row_count == 1
     assert row["request_id"] == "req_001"
-    assert row["event_date"] == "2026-01-01"
+    assert row["date"] == "2026-01-01"
     assert row["error_type"] == r"\N"
     assert row["trace_id"] == ""
     assert row["request_type"] == "chat"

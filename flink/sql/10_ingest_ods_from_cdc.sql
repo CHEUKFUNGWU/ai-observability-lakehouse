@@ -43,7 +43,7 @@ SELECT
     region,
     environment,
     created_at,
-    event_date,
+    `date`,
     'postgres_cdc' AS source_name,
     'llm_request' AS source_event_type,
     CURRENT_TIMESTAMP AS ingested_at
