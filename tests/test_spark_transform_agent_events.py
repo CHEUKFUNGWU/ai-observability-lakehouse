@@ -1,24 +1,9 @@
 from datetime import datetime
 
-import pytest
-from pyspark.sql import SparkSession
-
 from scripts.spark_transform_agent_events import (
     transform_agent_run_events,
     transform_agent_span_events,
 )
-
-
-@pytest.fixture(scope="session")
-def spark():
-    session = (
-        SparkSession.builder.appName("test-spark-transform-agent-events")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
-    yield session
-    session.stop()
 
 
 def test_transform_agent_run_events_casts_expected_types(spark):

@@ -1,20 +1,5 @@
-import pytest
-from pyspark.sql import SparkSession
-
 from scripts.spark_build_ods_agent_events import build_ods_agent_events
 from scripts.spark_build_ods_llm_events import build_ods_llm_events
-
-
-@pytest.fixture(scope="session")
-def spark():
-    session = (
-        SparkSession.builder.appName("test-ods-events")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
-    yield session
-    session.stop()
 
 
 def test_build_ods_llm_events_adds_source_metadata(spark):

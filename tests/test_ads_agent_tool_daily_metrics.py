@@ -1,21 +1,6 @@
 from datetime import date
 
-import pytest
-from pyspark.sql import SparkSession
-
 from scripts.spark_build_ads_agent_tool_daily_metrics import build_agent_tool_daily_metrics
-
-
-@pytest.fixture(scope="session")
-def spark():
-    session = (
-        SparkSession.builder.appName("test-ads-agent-tool-daily-metrics")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
-    yield session
-    session.stop()
 
 
 def test_build_agent_tool_daily_metrics_aggregates_by_agent_and_tool(spark):

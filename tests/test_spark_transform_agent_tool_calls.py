@@ -1,19 +1,4 @@
-import pytest
-from pyspark.sql import SparkSession
-
 from scripts.spark_transform_agent_tool_calls import transform_agent_tool_call_events
-
-
-@pytest.fixture(scope="session")
-def spark():
-    session = (
-        SparkSession.builder.appName("test-spark-transform-agent-tool-calls")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
-    yield session
-    session.stop()
 
 
 def test_transform_agent_tool_call_events_casts_expected_types(spark):

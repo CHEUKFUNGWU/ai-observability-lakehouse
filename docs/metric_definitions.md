@@ -243,30 +243,10 @@ Failure rate of Agent tool calls.
 ```sql
 SELECT
     tool_name,
-    countIf(status = 'error') AS failed_calls,
-    count(*) AS total_calls,
-    countIf(status = 'error') / count(*) AS failure_rate
-FROM agent_tool_events_ch
+    sum(error_count) AS failed_calls,
+    sum(tool_call_count) AS total_calls,
+    sum(error_count) / sum(tool_call_count) AS failure_rate
+FROM ai_observability.ads_agent_tool_daily_metrics
 GROUP BY tool_name
 ORDER BY failure_rate DESC;
-```
-
----
-
-## 15. RAG Retrieval Latency
-
-### Definition
-
-Average and p95 latency of RAG retrieval.
-
-### SQL
-
-```sql
-SELECT
-    vector_db,
-    avg(retrieval_latency_ms) AS avg_retrieval_latency,
-    quantile(0.95)(retrieval_latency_ms) AS p95_retrieval_latency
-FROM rag_retrieval_events_ch
-GROUP BY vector_db
-ORDER BY p95_retrieval_latency DESC;
 ```

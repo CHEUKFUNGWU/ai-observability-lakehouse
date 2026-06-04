@@ -1,22 +1,7 @@
-import pytest
-from pyspark.sql import SparkSession
-
 from scripts.spark_transform_llm_events import (
     count_invalid_token_totals,
     transform_llm_events,
 )
-
-@pytest.fixture(scope="session")
-def spark():
-    session = (
-        SparkSession.builder.appName("test-spark-transform-llm-events")
-        .master("local[*]")
-        .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
-    )
-
-    yield session
-    session.stop()
 
 def test_transform_llm_events_casts_expected_types(spark):
     raw_events = spark.createDataFrame(

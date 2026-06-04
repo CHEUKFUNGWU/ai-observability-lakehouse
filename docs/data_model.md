@@ -447,11 +447,11 @@ Hermes trajectories.jsonl
 
 ## 13. Planned Extensions
 
-The following event tables are natural next steps, but are not required for the current MVP:
+The following are natural next steps, but they are not part of the current implemented schema:
 
-| Table | Purpose |
+| Extension | Purpose |
 |---|---|
-| rag_retrieval_events | Query, embedding model, vector store, top_k, retrieved docs and retrieval latency |
-| model_pricing | Configurable model pricing table for cost calculation |
-| prompt_version_dim | Prompt metadata, owner, version and release status |
-| agent_dim | Agent metadata, owner, version and deployment status |
+| Retrieval observability fact | Query, embedding model, vector store, top_k, retrieved docs and retrieval latency |
+| Configurable model pricing | Externalized model pricing for cost calculation |
+| Prompt/version dimension | Prompt metadata, owner, version and release status |
+| Agent dimension | Agent metadata, owner, version and deployment status |
