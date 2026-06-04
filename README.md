@@ -466,8 +466,11 @@ This project supports live DeepSeek API calls to collect real LLM observability 
 ### Setup
 
 ```bash
-export DEEPSEEK_API_KEY="your_api_key"
-export DEEPSEEK_MODEL="deepseek-v4-flash"
+cp .env.example .env
+# Edit .env and set DEEPSEEK_API_KEY to your real key.
+set -a
+source .env
+set +a
 ```
 
 ### Run Live API Collection
