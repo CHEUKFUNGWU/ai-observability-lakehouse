@@ -23,6 +23,7 @@ def test_pipeline_builds_dwd_and_ads(tmp_path):
     ods_output = tmp_path / "warehouse" / "ods" / "llm_request" / "events.parquet"
     dwd_output = tmp_path / "warehouse" / "llm_request" / "events.parquet"
     ads_output = tmp_path / "warehouse" / "ads" / "llm_feature_daily_metrics.parquet"
+    quarantine_output = tmp_path / "warehouse" / "quarantine" / "llm_request" / "events.parquet"
 
     write_jsonl(
         count=5,
@@ -34,11 +35,12 @@ def test_pipeline_builds_dwd_and_ads(tmp_path):
     spark = build_spark_session("test-local-batch-pipeline")
     try:
         ods_rows = build_ods(spark, raw_output, ods_output)
-        dwd_rows = build_dwd(spark, ods_output, dwd_output)
+        dwd_rows, quarantine_rows = build_dwd(spark, ods_output, dwd_output, quarantine_output)
         ads_rows = build_ads(spark, dwd_output, ads_output)
     finally:
         spark.stop()
 
     assert ods_rows == 5
     assert dwd_rows == 5
+    assert quarantine_rows == 0
     assert 0 < ads_rows <= dwd_rows

@@ -1,12 +1,12 @@
 # AI Observability Lakehouse
 
-A stream-batch analytics lakehouse for monitoring LLM applications and Agent runtimes using Flink CDC, Flink SQL, Apache Paimon, Apache Spark and ClickHouse.
+A stream-batch analytics lakehouse for monitoring LLM applications and Agent runtimes using Postgres CDC, Kafka, Flink SQL, Apache Paimon, Apache Spark and ClickHouse.
 
 ## 1. Project Overview
 
 Modern AI applications generate large volumes of operational events, including LLM requests, token usage, latency, errors, agent runs, agent spans and tool calls. These logs are valuable for cost control, performance monitoring and product analytics, but they are often scattered across application logs and difficult to analyze.
 
-This project builds an end-to-end data platform that collects both simulated AI application events and real DeepSeek API call logs, transforms them into warehouse layers, supports streaming CDC ingestion through Flink/Paimon, keeps Spark for batch backfills, queries ADS metrics with ClickHouse and prepares dashboard-ready metrics.
+This project builds an end-to-end data platform that collects both simulated AI application events and real DeepSeek API call logs, transforms them into warehouse layers, supports streaming CDC ingestion through Postgres CDC -> Kafka -> Flink/Paimon, keeps Spark for batch backfills, queries ADS metrics with ClickHouse and prepares dashboard-ready metrics.
 
 ## 2. Business Value
 
@@ -66,6 +66,9 @@ Operational Source Tables
         |
         v
 Flink CDC
+        |
+        v
+Kafka ODS
         |
         v
 Flink SQL
@@ -147,7 +150,7 @@ The first stream-batch path focuses on LLM request events:
 ```text
 postgres.public.llm_request_events
 → Flink CDC source table
-→ paimon_lake.ods.llm_request_events
+→ kafka_ods_llm_request_events
 → paimon_lake.dwd.llm_request_events
 → paimon_lake.ads.llm_feature_daily_metrics
 ```
@@ -163,11 +166,11 @@ Execution order:
 ```text
 00_catalogs.sql
 01_source_postgres_cdc.sql
-02_ods_paimon_tables.sql
+02_ods_kafka_tables.sql
 03_dwd_paimon_tables.sql
 04_ads_paimon_tables.sql
-10_ingest_ods_from_cdc.sql
-20_build_dwd_from_ods.sql
+10_ingest_ods_to_kafka.sql
+20_build_dwd_from_kafka_ods.sql
 30_build_ads_from_dwd.sql
 ```
 
@@ -183,8 +186,9 @@ Build and start the local Flink runtime:
 
 ```bash
 docker compose build flink-jobmanager
-docker compose up -d postgres flink-jobmanager flink-taskmanager
+docker compose up -d postgres kafka flink-jobmanager flink-taskmanager
 scripts/prepare_flink_warehouse.sh
+scripts/create_kafka_topics.sh
 ```
 
 Load local JSONL events into the Postgres operational source table:
@@ -200,7 +204,7 @@ Run a Flink SQL asset:
 scripts/run_flink_sql_file.sh flink/sql/00_catalogs.sql
 ```
 
-The SQL runner uses a dedicated `flink-sql-client` container, following the Apache Flink session cluster pattern: JobManager and TaskManager stay as the runtime cluster, while SQL Client submits statements to that cluster.
+The SQL runner uses a dedicated `flink-sql-client` container, following the Apache Flink session cluster pattern: JobManager and TaskManager stay as the runtime cluster, while SQL Client submits statements to that cluster. Kafka is the real-time ODS buffer, while Paimon stores validated DWD and ADS tables.
 
 The Flink Web UI is available at:
 
@@ -364,6 +368,7 @@ The current dashboard query set covers:
 - Latency by feature
 - Cost and usage by model
 - App and feature leaderboard
+- Cost by model with pricing metadata
 
 ## 11. Repository Structure
 
@@ -376,19 +381,22 @@ ai-observability-lakehouse/
 │   └── sql/
 │       ├── 00_catalogs.sql
 │       ├── 01_source_postgres_cdc.sql
-│       ├── 02_ods_paimon_tables.sql
+│       ├── 02_ods_kafka_tables.sql
 │       ├── 03_dwd_paimon_tables.sql
 │       ├── 04_ads_paimon_tables.sql
-│       ├── 10_ingest_ods_from_cdc.sql
-│       ├── 20_build_dwd_from_ods.sql
+│       ├── 10_ingest_ods_to_kafka.sql
+│       ├── 20_build_dwd_from_kafka_ods.sql
 │       └── 30_build_ads_from_dwd.sql
 ├── pyproject.toml
 ├── uv.lock
 ├── app/
 │   ├── __init__.py
 │   ├── agent_event.py
+│   ├── data_quality.py
 │   ├── deepseek_client.py
-│   └── llm_event.py
+│   ├── dim_model.py
+│   ├── llm_event.py
+│   └── pipeline_metadata.py
 ├── data/
 │   ├── raw/
 │   │   ├── mock_llm_requests/
@@ -398,6 +406,7 @@ ai-observability-lakehouse/
 │   └── warehouse/
 │       ├── ods/
 │       ├── llm_request/
+│       ├── quarantine/
 │       ├── live_llm_request/
 │       ├── agent_run/
 │       ├── agent_span/
@@ -409,10 +418,14 @@ ai-observability-lakehouse/
 ├── scripts/
 │   ├── generate_mock_agent_logs.py
 │   ├── generate_mock_llm_logs.py
+│   ├── create_kafka_topics.sh
 │   ├── load_ads_metrics_to_clickhouse.py
 │   ├── parse_hermes_trajectories.py
+│   ├── run_benchmark.py
 │   ├── run_deepseek_live_calls.py
+│   ├── run_full_demo.sh
 │   ├── run_local_batch_pipeline.py
+│   ├── spark_build_ads_cost_anomaly.py
 │   ├── spark_build_ods_llm_events.py
 │   ├── spark_build_ods_agent_events.py
 │   ├── spark_build_ods_agent_tool_calls.py

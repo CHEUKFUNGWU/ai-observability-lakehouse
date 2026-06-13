@@ -16,6 +16,9 @@ Operational Source Tables
 Flink CDC
         |
         v
+Kafka ODS
+        |
+        v
 Flink SQL
         |
         v
@@ -32,7 +35,8 @@ Spark Batch Backfill   ClickHouse / Dashboard
 | Component | Responsibility |
 |---|---|
 | Flink CDC | Capture source-table changes from operational systems |
-| Flink SQL | Define streaming transformations from source to ODS, DWD and ADS |
+| Kafka | Buffer CDC events, provide replay, and decouple capture from downstream transforms |
+| Flink SQL | Define streaming transformations from Kafka ODS to DWD and ADS |
 | Paimon | Store lakehouse tables that support streaming writes and batch reads |
 | Spark | Batch backfill, offline correction, large-scale historical recomputation |
 | ClickHouse | Low-latency serving layer for dashboard queries |
@@ -44,7 +48,7 @@ The generator, live collector and Hermes parser are sources or source adapters. 
 ```text
 Source
   -> CDC / raw landing
-  -> ODS Paimon tables
+  -> Kafka ODS
   -> DWD Paimon tables
   -> ADS Paimon tables
   -> ClickHouse serving tables
@@ -57,7 +61,7 @@ The first streaming scope focuses on LLM request observability because it alread
 ```text
 postgres.public.llm_request_events
   -> Flink CDC source table
-  -> paimon_lake.ods.llm_request_events
+  -> kafka_ods_llm_request_events
   -> paimon_lake.dwd.llm_request_events
   -> paimon_lake.ads.llm_feature_daily_metrics
 ```
@@ -106,11 +110,11 @@ Execution order:
 ```text
 00_catalogs.sql
 01_source_postgres_cdc.sql
-02_ods_paimon_tables.sql
+02_ods_kafka_tables.sql
 03_dwd_paimon_tables.sql
 04_ads_paimon_tables.sql
-10_ingest_ods_from_cdc.sql
-20_build_dwd_from_ods.sql
+10_ingest_ods_to_kafka.sql
+20_build_dwd_from_kafka_ods.sql
 30_build_ads_from_dwd.sql
 ```
 
@@ -128,6 +132,6 @@ The Docker runtime follows the Apache Flink standalone session-cluster pattern:
 - `flink-sql-client` is a short-lived tool service started with `docker compose run --rm` to submit SQL.
 - `scripts/prepare_flink_warehouse.sh` prepares the shared Paimon warehouse directories and grants write permission to the `flink` runtime user.
 
-The local TaskManager uses four slots so the ODS, DWD, and ADS streaming jobs can remain running while batch verification queries read Paimon snapshots.
+The local TaskManager uses four slots so the Kafka ingestion, DWD, and ADS streaming jobs can remain running while batch verification queries read Paimon snapshots.
 
 For the local Flink ADS MVP, `max_latency_ms` is populated with `MAX(latency_ms)` as an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate. Spark and ClickHouse remain the better places for exact or approximate percentile reporting.

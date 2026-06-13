@@ -1,7 +1,7 @@
 <clickhouse>
   <users>
     <loader>
-      <password></password>
+        <password>loader_pass</password>
       <networks>
         <ip>::/0</ip>
       </networks>

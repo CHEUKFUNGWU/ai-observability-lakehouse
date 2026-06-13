@@ -8,13 +8,12 @@ FLINK_SQL_DIR = REPO_ROOT / "flink" / "sql"
 EXPECTED_FLINK_SQL_FILES = [
     "00_catalogs.sql",
     "01_source_postgres_cdc.sql",
-    "02_ods_paimon_tables.sql",
+    "02_ods_kafka_tables.sql",
     "03_dwd_paimon_tables.sql",
     "04_ads_paimon_tables.sql",
-    "10_ingest_ods_from_cdc.sql",
-    "20_build_dwd_from_ods.sql",
+    "10_ingest_ods_to_kafka.sql",
+    "20_build_dwd_from_kafka_ods.sql",
     "30_build_ads_from_dwd.sql",
-    "90_verify_ods_count.sql",
     "91_verify_dwd_count.sql",
     "92_verify_ads_metrics.sql",
 ]
@@ -52,42 +51,33 @@ def test_source_sql_uses_postgres_cdc_connector():
 
 
 def test_paimon_layers_use_expected_tables():
-    ods_sql = read_asset("flink/sql/02_ods_paimon_tables.sql")
+    ods_sql = read_asset("flink/sql/02_ods_kafka_tables.sql")
     dwd_sql = read_asset("flink/sql/03_dwd_paimon_tables.sql")
     ads_sql = read_asset("flink/sql/04_ads_paimon_tables.sql")
 
-    assert "paimon_lake.ods.llm_request_events" in ods_sql
+    assert "kafka_ods_llm_request_events" in ods_sql
+    assert "'connector' = 'kafka'" in ods_sql
     assert "paimon_lake.dwd.llm_request_events" in dwd_sql
     assert "paimon_lake.ads.llm_feature_daily_metrics" in ads_sql
-    assert "source_name STRING" in ods_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in dwd_sql
     assert "PARTITIONED BY (`date`)" in ads_sql
 
 
 def test_flink_sql_layer_dependencies_are_explicit():
-    ingest_sql = read_asset("flink/sql/10_ingest_ods_from_cdc.sql")
-    dwd_sql = read_asset("flink/sql/20_build_dwd_from_ods.sql")
+    ingest_sql = read_asset("flink/sql/10_ingest_ods_to_kafka.sql")
+    dwd_sql = read_asset("flink/sql/20_build_dwd_from_kafka_ods.sql")
     ads_sql = read_asset("flink/sql/30_build_ads_from_dwd.sql")
 
-    assert "INSERT INTO paimon_lake.ods.llm_request_events" in ingest_sql
+    assert "INSERT INTO kafka_ods_llm_request_events" in ingest_sql
     assert "FROM src_llm_request_events" in ingest_sql
     assert "INSERT INTO paimon_lake.dwd.llm_request_events" in dwd_sql
-    assert "FROM paimon_lake.ods.llm_request_events" in dwd_sql
+    assert "FROM kafka_ods_llm_request_events" in dwd_sql
     assert "WHERE total_tokens = prompt_tokens + completion_tokens" in dwd_sql
     assert "INSERT INTO paimon_lake.ads.llm_feature_daily_metrics" in ads_sql
     assert "FROM paimon_lake.dwd.llm_request_events" in ads_sql
     assert "CAST(MAX(latency_ms) AS DOUBLE) AS max_latency_ms" in ads_sql
     assert "p95_latency_ms" not in ads_sql
     assert "PERCENTILE_CONT(" not in ads_sql
-
-
-def test_flink_verify_ods_count_uses_batch_mode():
-    sql = read_asset("flink/sql/90_verify_ods_count.sql")
-
-    assert "SET 'execution.runtime-mode' = 'batch'" in sql
-    assert "SET 'sql-client.execution.result-mode' = 'TABLEAU'" in sql
-    assert "COUNT(*) AS ods_row_count" in sql
-    assert "FROM paimon_lake.ods.llm_request_events" in sql
 
 
 def test_flink_verify_sql_covers_dwd_and_ads_layers():
@@ -112,15 +102,17 @@ def test_postgres_source_schema_matches_cdc_source_table():
     assert "idx_llm_request_events_date" in postgres_sql
 
 
-def test_flink_dockerfile_installs_paimon_and_postgres_cdc_connectors():
+def test_flink_dockerfile_installs_paimon_postgres_and_kafka_connectors():
     dockerfile = read_asset("docker/flink/Dockerfile")
 
     assert "FROM flink:${FLINK_VERSION}-scala_2.12-java17" in dockerfile
     assert "ARG PAIMON_VERSION=1.2.0" in dockerfile
     assert "ARG FLINK_CDC_VERSION=3.2.1" in dockerfile
     assert "ARG FLINK_SHADED_HADOOP_VERSION=2.8.3-10.0" in dockerfile
+    assert "ARG FLINK_KAFKA_VERSION=3.3.0-1.20" in dockerfile
     assert "paimon-flink-1.20" in dockerfile
     assert "flink-sql-connector-postgres-cdc" in dockerfile
+    assert "flink-sql-connector-kafka" in dockerfile
     assert "flink-shaded-hadoop-2-uber" in dockerfile
     assert "/opt/flink/lib" in dockerfile
 
@@ -128,6 +120,7 @@ def test_flink_dockerfile_installs_paimon_and_postgres_cdc_connectors():
 def test_compose_defines_stream_batch_runtime_services():
     compose = read_asset("docker-compose.yml")
 
+    assert "kafka:" in compose
     assert "flink-jobmanager:" in compose
     assert "flink-taskmanager:" in compose
     assert "flink-sql-client:" in compose
@@ -142,6 +135,8 @@ def test_compose_defines_stream_batch_runtime_services():
     assert "state.savepoints.dir: file:///workspace/data/paimon/_savepoints" in compose
     assert "wal_level=logical" in compose
     assert "max_replication_slots=10" in compose
+    assert "KAFKA_PROCESS_ROLES: broker,controller" in compose
+    assert "CLUSTER_ID: 'ai-observability-kafka-cluster-001'" in compose
 
 
 def test_flink_sql_runner_uses_dedicated_sql_client_service():

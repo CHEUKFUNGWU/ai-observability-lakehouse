@@ -111,3 +111,25 @@ FROM
         feature_name
 )
 ORDER BY request_count_sum DESC;
+
+-- 8. Cost by model with pricing metadata.
+SELECT
+    m.model_name,
+    m.provider,
+    m.input_price_per_1m_tokens,
+    m.output_price_per_1m_tokens,
+    a.request_count,
+    a.total_tokens,
+    a.estimated_cost_usd
+FROM
+(
+    SELECT
+        model_name,
+        sum(request_count) AS request_count,
+        sum(total_tokens) AS total_tokens,
+        sum(estimated_cost_usd) AS estimated_cost_usd
+    FROM ai_observability.ads_llm_feature_daily_metrics
+    GROUP BY model_name
+) a
+JOIN ai_observability.dim_model m ON a.model_name = m.model_name
+ORDER BY estimated_cost_usd DESC;

@@ -1,7 +1,7 @@
 from scripts.spark_transform_llm_events import (
-    count_invalid_token_totals,
     transform_llm_events,
 )
+from app.data_quality import split_valid_quarantine, validate_llm_events
 
 def test_transform_llm_events_casts_expected_types(spark):
     raw_events = spark.createDataFrame(
@@ -106,7 +106,7 @@ def test_transform_llm_events_drops_text_payloads_from_dwd(spark):
     assert row["input_chars"] == 5
     assert row["output_chars"] == 2
 
-def test_count_invalid_token_totals_returns_zero_for_valid_rows(spark):
+def test_validate_llm_events_marks_valid_rows(spark):
     raw_events = spark.createDataFrame(
         [
             {
@@ -139,11 +139,13 @@ def test_count_invalid_token_totals_returns_zero_for_valid_rows(spark):
         ]
     )
 
-    events = transform_llm_events(raw_events)
+    events = validate_llm_events(transform_llm_events(raw_events))
+    valid_events, quarantine_events = split_valid_quarantine(events)
 
-    assert count_invalid_token_totals(events) == 0
+    assert valid_events.count() == 1
+    assert quarantine_events.count() == 0
 
-def test_count_invalid_token_totals_detects_invalid_rows(spark):
+def test_validate_llm_events_quarantines_invalid_rows(spark):
     raw_events = spark.createDataFrame(
         [
             {
@@ -176,6 +178,10 @@ def test_count_invalid_token_totals_detects_invalid_rows(spark):
         ]
     )
 
-    events = transform_llm_events(raw_events)
+    events = validate_llm_events(transform_llm_events(raw_events))
+    valid_events, quarantine_events = split_valid_quarantine(events)
 
-    assert count_invalid_token_totals(events) == 1
+    assert valid_events.count() == 0
+    row = quarantine_events.collect()[0]
+    assert row["_dq_status"] == "quarantine"
+    assert "consistency:token_total_mismatch" in row["_dq_errors"]

@@ -1,10 +1,12 @@
 import argparse
 from pathlib import Path
+from datetime import datetime, timezone
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
+from app.pipeline_metadata import append_pipeline_run
 from scripts.spark_utils import build_spark_session
 
 
@@ -36,6 +38,8 @@ def build_agent_daily_metrics(runs: DataFrame, spans: DataFrame) -> DataFrame:
         F.expr("percentile_approx(duration_ms, 0.95)").alias("p95_duration_ms"),
     )
 
+    # Span facts do not natively carry app/task dimensions, so we enrich them from the run grain
+    # before aggregation to avoid duplicating span counts across multiple task types.
     run_dimensions = runs.select(*run_span_keys, "app_name", "agent_name", "task_type")
     spans_with_run_dimensions = spans.join(run_dimensions, on=run_span_keys, how="inner")
 
@@ -78,12 +82,22 @@ def main() -> None:
     args = parser.parse_args()
 
     spark = build_spark_session("ai-observability-ads-agent-daily-metrics")
+    started_at = datetime.now(timezone.utc)
     try:
         runs = load_events(spark, args.run_input)
         spans = load_events(spark, args.span_input)
         metrics = build_agent_daily_metrics(runs, spans)
         write_ads_metrics(metrics, args.output)
-        log_info(LOGGER, "ads_agent_daily_metrics_written", output=str(args.output), rows=metrics.count())
+        row_count = metrics.count()
+        log_info(LOGGER, "ads_agent_daily_metrics_written", output=str(args.output), rows=row_count)
+        append_pipeline_run(
+            pipeline_name="spark_build_ads_agent_daily_metrics",
+            layer="ads",
+            start_time=started_at,
+            end_time=datetime.now(timezone.utc),
+            input_rows=runs.count() + spans.count(),
+            output_rows=row_count,
+        )
     finally:
         spark.stop()
 

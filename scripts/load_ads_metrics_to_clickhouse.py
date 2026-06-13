@@ -12,6 +12,7 @@ DEFAULT_INPUT_PATH = Path("data/warehouse/ads/llm_feature_daily_metrics.parquet"
 DEFAULT_TABLE_NAME = "ads_llm_feature_daily_metrics"
 DEFAULT_DATABASE = "ai_observability"
 DEFAULT_USER = "loader"
+DEFAULT_PASSWORD = "loader_pass"
 LOGGER = get_logger(__name__)
 IDENTIFIER_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
@@ -24,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", type=str, default="localhost")
     parser.add_argument("--port", type=int, default=8123)
     parser.add_argument("--user", type=str, default=DEFAULT_USER)
-    parser.add_argument("--password", type=str, default="")
+    parser.add_argument("--password", type=str, default=DEFAULT_PASSWORD)
     return parser.parse_args()
 
 

@@ -1,0 +1,7 @@
+rules:
+  - feature_name: chat
+    p95_latency_ms_max: 3000
+    error_rate_max: 0.05
+  - feature_name: rag_answer
+    p95_latency_ms_max: 5000
+    error_rate_max: 0.03

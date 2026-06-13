@@ -18,7 +18,7 @@ There are two execution paths:
 | Path | Role |
 |---|---|
 | Spark batch | Local batch transform, backfill, testable development path |
-| Flink + Paimon | Stream-batch lakehouse path from Postgres CDC to ODS/DWD/ADS |
+| Flink + Kafka + Paimon | Stream-batch lakehouse path from Postgres CDC to Kafka ODS then Paimon DWD/ADS |
 
 ClickHouse is the serving layer for dashboard queries. It has ADS tables for fast aggregated views and DWD detail tables for proper percentile computation.
 
@@ -97,7 +97,7 @@ Flink SQL assets live under `flink/sql/`.
 ```text
 Postgres source table
   -> Flink CDC source
-  -> Paimon ODS table
+  -> Kafka ODS table
   -> Paimon DWD table
   -> Paimon ADS table
 ```
@@ -108,28 +108,29 @@ Implemented Flink SQL files:
 |---|---|
 | `00_catalogs.sql` | Create Paimon catalog and databases |
 | `01_source_postgres_cdc.sql` | Define Postgres CDC source |
-| `02_ods_paimon_tables.sql` | Define ODS Paimon table |
+| `02_ods_kafka_tables.sql` | Define Kafka ODS table |
 | `03_dwd_paimon_tables.sql` | Define DWD Paimon table |
 | `04_ads_paimon_tables.sql` | Define ADS Paimon table |
-| `10_ingest_ods_from_cdc.sql` | Insert source changes into ODS |
-| `20_build_dwd_from_ods.sql` | Validate and transform ODS to DWD |
+| `10_ingest_ods_to_kafka.sql` | Insert source changes into Kafka ODS |
+| `20_build_dwd_from_kafka_ods.sql` | Validate and transform Kafka ODS to DWD |
 | `30_build_ads_from_dwd.sql` | Aggregate DWD to ADS |
 
 All systems use `date` as the partition/date field. In Flink SQL it is escaped as `` `date` `` because `DATE` is also a type keyword.
 
 ## 6. Warehouse Modeling Rules
 
-ODS:
+Kafka ODS:
 
 - Preserves source-aligned fields.
-- Adds `source_name`, `source_event_type`, `ingested_at`, and `raw_event_json`.
+- Buffers CDC changes for replay and downstream decoupling.
 
 DWD:
 
 - Casts types.
-- Applies row-level validation.
+- Applies row-level validation through the Spark data-quality module.
 - Keeps hash and size fields for prompt/response analytics.
 - Drops raw `prompt_text` and `response_text` from LLM DWD to avoid large/sensitive text in analytical facts.
+- Sends invalid rows to quarantine instead of failing the whole batch.
 
 ADS:
 
@@ -157,6 +158,10 @@ Implemented ClickHouse ADS tables:
 - `ads_llm_feature_daily_metrics`
 - `ads_agent_daily_metrics`
 - `ads_agent_tool_daily_metrics`
+- `ads_cost_anomaly_daily`
+- `ads_sla_daily_report`
+- `ads_prompt_version_daily_metrics`
+- `dim_model`
 
 Loader:
 
@@ -215,17 +220,17 @@ Run Flink SQL files in a shared SQL session:
 scripts/run_flink_sql_sequence.sh \
   flink/sql/00_catalogs.sql \
   flink/sql/01_source_postgres_cdc.sql \
-  flink/sql/02_ods_paimon_tables.sql \
+  flink/sql/02_ods_kafka_tables.sql \
   flink/sql/03_dwd_paimon_tables.sql \
-  flink/sql/04_ads_paimon_tables.sql
+  flink/sql/04_ads_paimon_tables.sql \
+  flink/sql/10_ingest_ods_to_kafka.sql \
+  flink/sql/20_build_dwd_from_kafka_ods.sql
 ```
 
 ## 10. Planned Extensions
 
-The following are reasonable next steps, but are not current implemented core schema:
+Remaining optional extensions:
 
-- RAG retrieval event fact table
 - Agent dimension table
-- Prompt/version dimension table
-- Config-driven model pricing table
-- Dashboard app or Superset export
+- RAG retrieval event fact table
+- Dashboard application layer

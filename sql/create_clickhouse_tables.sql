@@ -7,6 +7,11 @@ DROP TABLE IF EXISTS ai_observability.dwd_agent_tool_call_events;
 DROP TABLE IF EXISTS ai_observability.ads_llm_feature_daily_metrics;
 DROP TABLE IF EXISTS ai_observability.ads_agent_daily_metrics;
 DROP TABLE IF EXISTS ai_observability.ads_agent_tool_daily_metrics;
+DROP TABLE IF EXISTS ai_observability.dim_model;
+DROP TABLE IF EXISTS ai_observability.ads_cost_anomaly_daily;
+DROP TABLE IF EXISTS ai_observability.ads_sla_daily_report;
+DROP TABLE IF EXISTS ai_observability.ads_prompt_version_daily_metrics;
+DROP TABLE IF EXISTS ai_observability.mv_daily_summary;
 
 CREATE TABLE IF NOT EXISTS ai_observability.dwd_llm_request_events
 (
@@ -169,6 +174,19 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, app_name, feature_name, model_name);
 
+CREATE TABLE IF NOT EXISTS ai_observability.dim_model
+(
+    model_name String,
+    provider String,
+    input_price_per_1m_tokens Float64,
+    output_price_per_1m_tokens Float64,
+    max_context_tokens UInt32,
+    release_date Date,
+    status String
+)
+ENGINE = ReplacingMergeTree
+ORDER BY model_name;
+
 CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_daily_metrics
 (
     date Date,
@@ -214,3 +232,68 @@ CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_tool_daily_metrics
 ENGINE = MergeTree
 PARTITION BY toYYYYMM(date)
 ORDER BY (date, agent_id, tool_name, tool_type);
+
+CREATE TABLE IF NOT EXISTS ai_observability.ads_cost_anomaly_daily
+(
+    date Date,
+    app_name String,
+    feature_name String,
+    model_name String,
+    request_count UInt64,
+    estimated_cost_usd Float64,
+    prev_day_cost Nullable(Float64),
+    cost_change_rate Nullable(Float64),
+    is_anomaly Bool
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(date)
+ORDER BY (date, app_name, feature_name, model_name);
+
+CREATE TABLE IF NOT EXISTS ai_observability.ads_sla_daily_report
+(
+    date Date,
+    app_name String,
+    feature_name String,
+    model_name String,
+    request_count UInt64,
+    error_count UInt64,
+    p95_latency_ms UInt64,
+    error_rate Float64,
+    p95_latency_ms_max Nullable(UInt64),
+    error_rate_max Nullable(Float64),
+    is_latency_breach Bool,
+    is_error_breach Bool
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(date)
+ORDER BY (date, app_name, feature_name, model_name);
+
+CREATE TABLE IF NOT EXISTS ai_observability.ads_prompt_version_daily_metrics
+(
+    date Date,
+    prompt_id String,
+    prompt_version String,
+    model_name String,
+    request_count UInt64,
+    avg_latency_ms Float64,
+    p95_latency_ms UInt64,
+    error_count UInt64,
+    estimated_cost_usd Float64
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(date)
+ORDER BY (date, prompt_id, prompt_version, model_name);
+
+CREATE MATERIALIZED VIEW IF NOT EXISTS ai_observability.mv_daily_summary
+ENGINE = SummingMergeTree
+ORDER BY date
+AS
+SELECT
+    date,
+    sum(request_count) AS request_count,
+    sum(success_count) AS success_count,
+    sum(error_count) AS error_count,
+    sum(total_tokens) AS total_tokens,
+    sum(estimated_cost_usd) AS estimated_cost_usd
+FROM ai_observability.ads_llm_feature_daily_metrics
+GROUP BY date;
