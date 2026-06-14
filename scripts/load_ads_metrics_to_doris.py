@@ -3,18 +3,33 @@ import re
 from datetime import date
 from pathlib import Path
 
-import clickhouse_connect
 import pyarrow.parquet as pq
+import pymysql
 
 from app.logging_utils import get_logger, log_info
 
 DEFAULT_INPUT_PATH = Path("data/warehouse/ads/llm_feature_daily_metrics.parquet")
 DEFAULT_TABLE_NAME = "ads_llm_feature_daily_metrics"
 DEFAULT_DATABASE = "ai_observability"
-DEFAULT_USER = "loader"
-DEFAULT_PASSWORD = "loader_pass"
+DEFAULT_USER = "root"
+DEFAULT_PASSWORD = ""
 LOGGER = get_logger(__name__)
 IDENTIFIER_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+LOAD_COLUMNS = [
+    "date",
+    "app_name",
+    "feature_name",
+    "model_name",
+    "request_count",
+    "success_count",
+    "error_count",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "estimated_cost_usd",
+    "avg_latency_ms",
+    "p95_latency_ms",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,7 +38,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--database", type=str, default=DEFAULT_DATABASE)
     parser.add_argument("--table", type=str, default=DEFAULT_TABLE_NAME)
     parser.add_argument("--host", type=str, default="localhost")
-    parser.add_argument("--port", type=int, default=8123)
+    parser.add_argument("--port", type=int, default=9030)
     parser.add_argument("--user", type=str, default=DEFAULT_USER)
     parser.add_argument("--password", type=str, default=DEFAULT_PASSWORD)
     return parser.parse_args()
@@ -43,19 +58,19 @@ def normalize_row(row: dict) -> dict:
     return normalized
 
 
-def validate_clickhouse_identifier(identifier: str) -> str:
+def validate_doris_identifier(identifier: str) -> str:
     if not IDENTIFIER_PATTERN.fullmatch(identifier):
-        raise ValueError(f"Invalid ClickHouse identifier: {identifier!r}")
+        raise ValueError(f"Invalid Doris identifier: {identifier!r}")
     return identifier
 
 
 def qualified_table_name(database: str, table: str) -> str:
-    safe_database = validate_clickhouse_identifier(database)
-    safe_table = validate_clickhouse_identifier(table)
-    return f"{safe_database}.{safe_table}"
+    safe_database = validate_doris_identifier(database)
+    safe_table = validate_doris_identifier(table)
+    return f"`{safe_database}`.`{safe_table}`"
 
 
-def load_rows_to_clickhouse(
+def load_rows_to_doris(
     rows: list[dict],
     database: str,
     table: str,
@@ -64,51 +79,41 @@ def load_rows_to_clickhouse(
     user: str,
     password: str,
 ) -> None:
-    client = clickhouse_connect.get_client(
+    connection = pymysql.connect(
         host=host,
         port=port,
-        username=user,
+        user=user,
         password=password,
         database=database,
+        autocommit=False,
     )
 
     table_name = qualified_table_name(database, table)
 
-    client.command(f"TRUNCATE TABLE {table_name}")
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute(f"TRUNCATE TABLE {table_name}")
 
-    if not rows:
-        return
+            if not rows:
+                connection.commit()
+                return
 
-    columns = [
-        "date",
-        "app_name",
-        "feature_name",
-        "model_name",
-        "request_count",
-        "success_count",
-        "error_count",
-        "prompt_tokens",
-        "completion_tokens",
-        "total_tokens",
-        "estimated_cost_usd",
-        "avg_latency_ms",
-        "p95_latency_ms",
-    ]
+            placeholders = ", ".join(["%s"] * len(LOAD_COLUMNS))
+            column_clause = ", ".join(f"`{column}`" for column in LOAD_COLUMNS)
+            insert_sql = f"INSERT INTO {table_name} ({column_clause}) VALUES ({placeholders})"
+            values = [tuple(row[column] for column in LOAD_COLUMNS) for row in rows]
+            cursor.executemany(insert_sql, values)
 
-    data = [[row[column] for column in columns] for row in rows]
-
-    client.insert(
-        table=table_name,
-        data=data,
-        column_names=columns,
-    )
+        connection.commit()
+    finally:
+        connection.close()
 
 
 def main() -> None:
     args = parse_args()
 
     rows = read_parquet_rows(args.input)
-    load_rows_to_clickhouse(
+    load_rows_to_doris(
         rows=rows,
         database=args.database,
         table=args.table,
@@ -118,7 +123,7 @@ def main() -> None:
         password=args.password,
     )
 
-    log_info(LOGGER, "clickhouse_ads_metrics_loaded", rows=len(rows), database=args.database, table=args.table)
+    log_info(LOGGER, "doris_ads_metrics_loaded", rows=len(rows), database=args.database, table=args.table)
 
 
 if __name__ == "__main__":

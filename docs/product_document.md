@@ -45,7 +45,7 @@ Source adapters
   -> ODS source event tables
   -> DWD typed fact tables
   -> ADS dashboard metric tables
-  -> ClickHouse serving tables
+  -> Doris serving tables
 ```
 
 | Layer | Responsibility |
@@ -54,7 +54,7 @@ Source adapters
 | ODS | Preserve source fields and add ingestion metadata |
 | DWD | Normalize data types, validate facts and remove oversized raw text where appropriate |
 | ADS | Store additive daily metrics for dashboards |
-| ClickHouse | Serve OLAP queries and support percentile calculation from DWD detail tables |
+| Doris | Serve OLAP queries and support percentile calculation from DWD detail tables |
 
 ## 5. Dashboard Questions
 
@@ -97,7 +97,7 @@ Implemented ADS metrics:
 - `agent_daily_metrics`
 - `agent_tool_daily_metrics`
 
-Implemented ClickHouse serving tables:
+Implemented Doris serving tables:
 
 - `dwd_llm_request_events`
 - `dwd_agent_run_events`
@@ -124,7 +124,7 @@ For data teams:
 For product and operations teams:
 
 - Track AI feature usage, cost, reliability and Agent tool behavior.
-- Use ClickHouse for fast operational dashboards.
+- Use Doris for fast operational dashboards.
 
 ## 8. Explicit Non-Scope For Current MVP
 

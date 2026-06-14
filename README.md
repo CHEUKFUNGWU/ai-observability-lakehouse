@@ -1,12 +1,12 @@
 # AI Observability Lakehouse
 
-A stream-batch analytics lakehouse for monitoring LLM applications and Agent runtimes using Postgres CDC, Kafka, Flink SQL, Apache Paimon, Apache Spark and ClickHouse.
+A stream-batch analytics lakehouse for monitoring LLM applications and Agent runtimes using Postgres CDC, Kafka, Flink SQL, Apache Paimon, Apache Spark and Doris.
 
 ## 1. Project Overview
 
 Modern AI applications generate large volumes of operational events, including LLM requests, token usage, latency, errors, agent runs, agent spans and tool calls. These logs are valuable for cost control, performance monitoring and product analytics, but they are often scattered across application logs and difficult to analyze.
 
-This project builds an end-to-end data platform that collects both simulated AI application events and real DeepSeek API call logs, transforms them into warehouse layers, supports streaming CDC ingestion through Postgres CDC -> Kafka -> Flink/Paimon, keeps Spark for batch backfills, queries ADS metrics with ClickHouse and prepares dashboard-ready metrics.
+This project builds an end-to-end data platform that collects both simulated AI application events and real DeepSeek API call logs, transforms them into warehouse layers, supports streaming CDC ingestion through Postgres CDC -> Kafka -> Flink/Paimon, keeps Spark for batch backfills, queries ADS metrics with Doris and prepares dashboard-ready metrics.
 
 ## 2. Business Value
 
@@ -30,7 +30,7 @@ The project helps answer practical AI application observability questions:
 - Flink SQL: streaming ODS, DWD and ADS transformations
 - Apache Paimon: stream-batch lakehouse table storage
 - Apache Spark: batch backfill, historical recomputation and validation
-- ClickHouse: low-latency OLAP queries
+- Doris: low-latency OLAP queries
 - Docker Compose: local development environment
 
 ## 4. Architecture
@@ -53,7 +53,7 @@ Apache Spark Batch Job
 DWD / ADS Warehouse Tables
         |
         v
-ClickHouse Query Layer
+Doris Query Layer
 ```
 
 ### Stream-Batch Architecture
@@ -79,7 +79,7 @@ Paimon ODS / DWD / ADS Tables
         +---------------------+
         |                     |
         v                     v
-Spark Batch Backfill     ClickHouse Query Layer
+Spark Batch Backfill     Doris Query Layer
 ```
 
 ## 5. Workload Modes
@@ -119,7 +119,7 @@ DeepSeek API call
 → JSONL event log
 → ODS source event table
 → DWD Parquet table
-→ ClickHouse query
+→ Doris query
 ```
 
 ### Phase 2: Large-Scale Mock Data
@@ -127,7 +127,7 @@ DeepSeek API call
 ```text
 Generate 1M / 10M mock events
 → Write to partitioned warehouse tables
-→ Query with ClickHouse
+→ Query with Doris
 → Benchmark query performance
 → Build dashboard
 ```
@@ -140,7 +140,7 @@ Operational source tables
 → Flink SQL
 → Paimon ODS / DWD / ADS
 → Spark batch backfill and validation
-→ ClickHouse
+→ Doris
 ```
 
 ## 8. Stream-Batch Flink/Paimon Path
@@ -324,39 +324,39 @@ Run tests:
 uv run pytest
 ```
 
-## 10. ClickHouse Query Layer
+## 10. Doris Query Layer
 
-The MVP query layer loads ADS metrics into a local ClickHouse `MergeTree` table for dashboard-style analytics.
+The MVP query layer loads ADS metrics into local Doris `DUPLICATE KEY` tables for dashboard-style analytics.
 
-Start ClickHouse:
+Start Doris:
 
 ```bash
-docker compose up -d clickhouse
+docker compose up -d doris-fe doris-be doris-init
 ```
 
-Create the ClickHouse database and ADS table:
+Create the Doris database and ADS table:
 
 ```bash
-docker compose exec -T clickhouse clickhouse-client --multiquery < sql/create_clickhouse_tables.sql
+docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root --multiquery < sql/create_doris_tables.sql
 ```
 
-Load ADS Parquet metrics into ClickHouse:
+Load ADS Parquet metrics into Doris:
 
 ```bash
-uv run python -m scripts.load_ads_metrics_to_clickhouse
+uv run python -m scripts.load_ads_metrics_to_doris
 ```
 
 Check the loaded row count:
 
 ```bash
-docker compose exec -T clickhouse clickhouse-client \
+docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root \
   --query "SELECT count() FROM ai_observability.ads_llm_feature_daily_metrics"
 ```
 
 Dashboard SQL examples are stored in:
 
 ```text
-sql/dashboard_queries.sql
+sql/doris_dashboard_queries.sql
 ```
 
 The current dashboard query set covers:
@@ -374,6 +374,12 @@ The current dashboard query set covers:
 
 ```text
 ai-observability-lakehouse/
+├── .env.example
+├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── Makefile
 ├── README.md
 ├── docker-compose.yml
 ├── flink/
@@ -386,7 +392,9 @@ ai-observability-lakehouse/
 │       ├── 04_ads_paimon_tables.sql
 │       ├── 10_ingest_ods_to_kafka.sql
 │       ├── 20_build_dwd_from_kafka_ods.sql
-│       └── 30_build_ads_from_dwd.sql
+│       ├── 30_build_ads_from_dwd.sql
+│       ├── 91_verify_dwd_count.sql
+│       └── 92_verify_ads_metrics.sql
 ├── pyproject.toml
 ├── uv.lock
 ├── app/
@@ -395,7 +403,9 @@ ai-observability-lakehouse/
 │   ├── data_quality.py
 │   ├── deepseek_client.py
 │   ├── dim_model.py
+│   ├── logging_utils.py
 │   ├── llm_event.py
+│   ├── model_pricing.py
 │   └── pipeline_metadata.py
 ├── data/
 │   ├── raw/
@@ -412,54 +422,80 @@ ai-observability-lakehouse/
 │       ├── agent_span/
 │       └── ads/
 ├── config/
-│   └── clickhouse/
-│       └── users.d/
-│           └── loader.xml
+│   ├── sla_rules.yaml
+│   └── doris/
+│       └── init_fe.sh
 ├── scripts/
+│   ├── create_kafka_topics.sh
+│   ├── export_llm_jsonl_to_postgres_copy.py
 │   ├── generate_mock_agent_logs.py
 │   ├── generate_mock_llm_logs.py
-│   ├── create_kafka_topics.sh
-│   ├── load_ads_metrics_to_clickhouse.py
+│   ├── load_ads_metrics_to_doris.py
+│   ├── load_llm_jsonl_to_postgres_source.sh
 │   ├── parse_hermes_trajectories.py
+│   ├── prepare_flink_warehouse.sh
 │   ├── run_benchmark.py
 │   ├── run_deepseek_live_calls.py
+│   ├── run_flink_sql_file.sh
+│   ├── run_flink_sql_sequence.sh
 │   ├── run_full_demo.sh
 │   ├── run_local_batch_pipeline.py
-│   ├── spark_build_ads_cost_anomaly.py
-│   ├── spark_build_ods_llm_events.py
-│   ├── spark_build_ods_agent_events.py
-│   ├── spark_build_ods_agent_tool_calls.py
-│   ├── spark_transform_agent_events.py
-│   ├── spark_transform_agent_tool_calls.py
 │   ├── spark_build_ads_agent_daily_metrics.py
 │   ├── spark_build_ads_agent_tool_daily_metrics.py
+│   ├── spark_build_ads_cost_anomaly.py
+│   ├── spark_build_ads_llm_feature_daily_metrics.py
+│   ├── spark_build_ads_prompt_version_metrics.py
+│   ├── spark_build_ads_sla_daily.py
+│   ├── spark_build_dim_model.py
+│   ├── spark_build_ods_agent_events.py
+│   ├── spark_build_ods_agent_tool_calls.py
+│   ├── spark_build_ods_llm_events.py
+│   ├── spark_transform_agent_events.py
+│   ├── spark_transform_agent_tool_calls.py
 │   ├── spark_transform_llm_events.py
-│   └── spark_build_ads_llm_feature_daily_metrics.py
+│   ├── spark_utils.py
+│   └── test_flink_failover.sh
 ├── sql/
-│   ├── create_clickhouse_tables.sql
-│   ├── dashboard_queries.sql
+│   ├── create_doris_tables.sql
+│   ├── doris_dashboard_queries.sql
 │   └── source_postgres_schema.sql
 ├── docs/
+│   ├── adr/
+│   │   ├── 001-paimon-over-iceberg.md
+│   │   ├── 002-kafka-as-realtime-ods.md
+│   │   ├── 003-no-stored-rates-in-ads.md
+│   │   ├── 004-flink-ads-p95-max-proxy.md
+│   │   └── 005-generic-agent-model.md
+│   ├── benchmark_results.md
+│   ├── data_lineage.md
+│   ├── failover_test_report.md
+│   ├── stream_batch_platform.md
+│   ├── upgrade_plan.md
 │   ├── product_document.md
 │   ├── technical_document.md
 │   ├── data_model.md
-│   ├── metric_definitions.md
-│   └── interview_talking_points.md
+│   └── metric_definitions.md
 └── tests/
-    ├── test_mock_agent_log_generation.py
-    ├── test_mock_log_generation.py
+    ├── conftest.py
+    ├── test_ads_agent_daily_metrics.py
+    ├── test_ads_agent_tool_daily_metrics.py
+    ├── test_ads_feature_daily_metrics.py
+    ├── test_doris_loader.py
+    ├── test_doris_schema.py
+    ├── test_data_quality.py
     ├── test_deepseek_client.py
     ├── test_deepseek_live_calls.py
+    ├── test_dim_and_analytics_assets.py
+    ├── test_flink_sql_assets.py
+    ├── test_local_batch_pipeline.py
+    ├── test_mock_agent_log_generation.py
+    ├── test_mock_log_generation.py
     ├── test_ods_events.py
     ├── test_parse_hermes_trajectories.py
+    ├── test_postgres_source_export.py
     ├── test_spark_transform_agent_events.py
     ├── test_spark_transform_agent_tool_calls.py
-    ├── test_ads_agent_tool_daily_metrics.py
-    ├── test_spark_transform_llm_events.py
-    ├── test_ads_agent_daily_metrics.py
-    ├── test_ads_feature_daily_metrics.py
-    ├── test_flink_sql_assets.py
-    └── test_local_batch_pipeline.py
+    └── test_spark_transform_llm_events.py
 ```
 
 ## 12. Live DeepSeek API Mode
@@ -534,7 +570,7 @@ uv run python -m scripts.spark_build_ads_llm_feature_daily_metrics \
 
 ## 13. Why This Project Matters
 
-This project is not just a ClickHouse demo. It demonstrates how modern AI applications can build an analytics foundation for cost control, performance monitoring and reliability analysis.
+This project is not just a Doris demo. It demonstrates how modern AI applications can build an analytics foundation for cost control, performance monitoring and reliability analysis.
 
 It combines practical AI engineering and data engineering:
 
@@ -547,7 +583,6 @@ It combines practical AI engineering and data engineering:
 
 ## 14. Future Roadmap
 
-- Kafka or another event bus for real-time application event streaming
 - Superset, Grafana or a custom dashboard application
 - Dedicated RAG retrieval observability facts
-- Config-driven model pricing and model metadata dimensions
+- Additional dimensions for agents, prompts, and retrieval corpora

@@ -18,7 +18,7 @@ graph LR
         DWD_S --> ADS_S["Paimon ADS"]
     end
     subgraph Serving
-        ADS_B --> CH["ClickHouse"]
+        ADS_B --> CH["Doris"]
         ADS_S --> CH
         DWD_B --> CH
         CH --> DASH["Dashboard"]

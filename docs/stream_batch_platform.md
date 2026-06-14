@@ -27,7 +27,7 @@ Paimon ODS / DWD / ADS Tables
         +------------------+
         |                  |
         v                  v
-Spark Batch Backfill   ClickHouse / Dashboard
+Spark Batch Backfill   Doris / Dashboard
 ```
 
 ## 2. Engine Responsibilities
@@ -39,7 +39,7 @@ Spark Batch Backfill   ClickHouse / Dashboard
 | Flink SQL | Define streaming transformations from Kafka ODS to DWD and ADS |
 | Paimon | Store lakehouse tables that support streaming writes and batch reads |
 | Spark | Batch backfill, offline correction, large-scale historical recomputation |
-| ClickHouse | Low-latency serving layer for dashboard queries |
+| Doris | Low-latency serving layer for dashboard queries |
 
 ## 3. Layering
 
@@ -51,7 +51,7 @@ Source
   -> Kafka ODS
   -> DWD Paimon tables
   -> ADS Paimon tables
-  -> ClickHouse serving tables
+  -> Doris serving tables
 ```
 
 ## 4. First Flink/Paimon Scope
@@ -95,7 +95,7 @@ Spark remains useful after Flink is introduced. Its role changes from the only t
 - Recompute historical DWD/ADS tables
 - Backfill late source ranges
 - Validate Flink/Paimon outputs against existing batch Parquet outputs
-- Export ADS metrics into ClickHouse when needed
+- Export ADS metrics into Doris when needed
 
 ## 7. Initial SQL Assets
 
@@ -134,4 +134,4 @@ The Docker runtime follows the Apache Flink standalone session-cluster pattern:
 
 The local TaskManager uses four slots so the Kafka ingestion, DWD, and ADS streaming jobs can remain running while batch verification queries read Paimon snapshots.
 
-For the local Flink ADS MVP, `max_latency_ms` is populated with `MAX(latency_ms)` as an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate. Spark and ClickHouse remain the better places for exact or approximate percentile reporting.
+For the local Flink ADS MVP, `max_latency_ms` is populated with `MAX(latency_ms)` as an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate. Spark and Doris remain the better places for exact or approximate percentile reporting.

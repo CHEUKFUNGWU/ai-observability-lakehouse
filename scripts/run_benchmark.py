@@ -17,6 +17,7 @@ def run_scale(scale: int) -> dict:
     raw_output = Path(f"data/benchmarks/{scale}/raw/events.jsonl")
     ods_output = Path(f"data/benchmarks/{scale}/warehouse/ods/events.parquet")
     dwd_output = Path(f"data/benchmarks/{scale}/warehouse/dwd/events.parquet")
+    quarantine_output = Path(f"data/benchmarks/{scale}/warehouse/quarantine/events.parquet")
     ads_output = Path(f"data/benchmarks/{scale}/warehouse/ads/events.parquet")
 
     write_jsonl(
@@ -33,7 +34,7 @@ def run_scale(scale: int) -> dict:
         ods_duration = time.perf_counter() - started
 
         started = time.perf_counter()
-        build_dwd(spark, ods_output, dwd_output)
+        _, quarantine_rows = build_dwd(spark, ods_output, dwd_output, quarantine_output)
         dwd_duration = time.perf_counter() - started
 
         started = time.perf_counter()
@@ -49,7 +50,8 @@ def run_scale(scale: int) -> dict:
         "dwd_duration": round(dwd_duration, 2),
         "ads_duration": round(ads_duration, 2),
         "parquet_size_mb": parquet_size_mb,
-        "clickhouse_query_p95_ms": "n/a",
+        "quarantine_rows": quarantine_rows,
+        "doris_query_p95_ms": "n/a",
     }
 
 
@@ -57,13 +59,14 @@ def render_markdown(results: list[dict]) -> str:
     lines = [
         "# Benchmark Results",
         "",
-        "| Scale | ODS Duration (s) | DWD Duration (s) | ADS Duration (s) | Parquet Size (MB) | CH Query P95 |",
-        "|---|---|---|---|---|---|",
+        "| Scale | ODS Duration (s) | DWD Duration (s) | ADS Duration (s) | Parquet Size (MB) | Quarantine Rows | Doris Query P95 |",
+        "|---|---|---|---|---|---|---|",
     ]
     for result in results:
         lines.append(
             f"| {result['scale']} | {result['ods_duration']} | {result['dwd_duration']} | "
-            f"{result['ads_duration']} | {result['parquet_size_mb']} | {result['clickhouse_query_p95_ms']} |"
+            f"{result['ads_duration']} | {result['parquet_size_mb']} | {result['quarantine_rows']} | "
+            f"{result['doris_query_p95_ms']} |"
         )
     return "\n".join(lines) + "\n"
 

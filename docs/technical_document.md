@@ -10,7 +10,7 @@ Mock / DeepSeek / Hermes sources
   -> ODS
   -> DWD
   -> ADS
-  -> ClickHouse
+  -> Doris
 ```
 
 There are two execution paths:
@@ -20,7 +20,7 @@ There are two execution paths:
 | Spark batch | Local batch transform, backfill, testable development path |
 | Flink + Kafka + Paimon | Stream-batch lakehouse path from Postgres CDC to Kafka ODS then Paimon DWD/ADS |
 
-ClickHouse is the serving layer for dashboard queries. It has ADS tables for fast aggregated views and DWD detail tables for proper percentile computation.
+Doris is the serving layer for dashboard queries. It has ADS tables for fast aggregated views and DWD detail tables for proper percentile computation.
 
 ## 2. Implemented Event Model
 
@@ -138,22 +138,22 @@ ADS:
 - Does not store redundant `success_rate` or `error_rate`.
 - Dashboard/query layer derives rates from counts.
 
-## 7. ClickHouse Serving Layer
+## 7. Doris Serving Layer
 
 Schema file:
 
 ```text
-sql/create_clickhouse_tables.sql
+sql/create_doris_tables.sql
 ```
 
-Implemented ClickHouse DWD tables:
+Implemented Doris DWD tables:
 
 - `dwd_llm_request_events`
 - `dwd_agent_run_events`
 - `dwd_agent_span_events`
 - `dwd_agent_tool_call_events`
 
-Implemented ClickHouse ADS tables:
+Implemented Doris ADS tables:
 
 - `ads_llm_feature_daily_metrics`
 - `ads_agent_daily_metrics`
@@ -166,7 +166,7 @@ Implemented ClickHouse ADS tables:
 Loader:
 
 ```text
-scripts/load_ads_metrics_to_clickhouse.py
+scripts/load_ads_metrics_to_doris.py
 ```
 
 The loader validates database and table identifiers before building `TRUNCATE TABLE` and `INSERT` targets.
@@ -191,7 +191,7 @@ Agent tool ADS grain:
 date, agent_id, tool_name, tool_type
 ```
 
-For Spark ADS, p95 metrics use `percentile_approx`. For the local Flink ADS MVP, `max_latency_ms` stores an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate in this setup. ClickHouse DWD tables are available for proper serving-layer percentile queries.
+For Spark ADS, p95 metrics use `percentile_approx`. For the local Flink ADS MVP, `max_latency_ms` stores an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate in this setup. Doris DWD tables are available for proper serving-layer percentile queries.
 
 ## 9. Local Verification
 
@@ -207,11 +207,11 @@ Run the local batch demo:
 uv run python -m scripts.run_local_batch_pipeline --count 100 --seed 42
 ```
 
-Start ClickHouse and create serving tables:
+Start Doris and create serving tables:
 
 ```bash
-docker compose up -d clickhouse
-docker compose exec -T clickhouse clickhouse-client --multiquery < sql/create_clickhouse_tables.sql
+docker compose up -d doris-fe doris-be doris-init
+docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root --multiquery < sql/create_doris_tables.sql
 ```
 
 Run Flink SQL files in a shared SQL session:

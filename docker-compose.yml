@@ -105,22 +105,48 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
 
-  clickhouse:
-    image: clickhouse/clickhouse-server:25.6
-    container_name: ai-observability-clickhouse
+  doris-fe:
+    image: apache/doris:2.1.7_fe-x86_64
+    container_name: ai-observability-doris-fe
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "8030:8030"
+      - "9030:9030"
     environment:
-      CLICKHOUSE_DB: ai_observability
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: "default_pass"
+      FE_SERVERS: "fe1:doris-fe:9010"
+      FE_ID: "1"
     volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - ./config/clickhouse/users.d/loader.xml:/etc/clickhouse-server/users.d/loader.xml:ro
+      - doris_fe_data:/opt/apache-doris/fe/doris-meta
+
+  doris-be:
+    image: apache/doris:2.1.7_be-x86_64
+    container_name: ai-observability-doris-be
+    ports:
+      - "8040:8040"
+      - "9050:9050"
+    environment:
+      FE_SERVERS: "fe1:doris-fe:9010"
+      BE_ADDR: "doris-be:9050"
+    volumes:
+      - doris_be_data:/opt/apache-doris/be/storage
+    depends_on:
+      - doris-fe
+
+  doris-init:
+    image: mysql:8.4
+    container_name: ai-observability-doris-init
+    entrypoint:
+      - /bin/sh
+      - /init_fe.sh
+    restart: "no"
+    volumes:
+      - ./config/doris/init_fe.sh:/init_fe.sh:ro
+    depends_on:
+      - doris-fe
+      - doris-be
   
 volumes:
   postgres_data:
   paimon_warehouse:
-  clickhouse_data:
+  doris_fe_data:
+  doris_be_data:
   kafka_data:

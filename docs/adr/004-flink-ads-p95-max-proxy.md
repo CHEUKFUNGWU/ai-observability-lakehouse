@@ -6,10 +6,10 @@ The local Flink SQL path does not use a production percentile aggregate implemen
 
 ## Decision
 
-Store `max_latency_ms` in Flink ADS and keep percentile reporting in Spark and ClickHouse layers.
+Store `max_latency_ms` in Flink ADS and keep percentile reporting in Spark and Doris layers.
 
 ## Consequences
 
 - Streaming ADS remains simple and stable.
 - The metric name avoids pretending that `MAX` is p95.
-- Users needing p95 should query Spark-produced ADS or ClickHouse DWD facts.
+- Users needing p95 should query Spark-produced ADS or Doris DWD facts.

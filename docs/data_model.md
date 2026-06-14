@@ -295,7 +295,7 @@ Partitioned by `date`.
 
 ### Business Meaning
 
-Daily feature-level LLM metrics for dashboard queries and ClickHouse loading.
+Daily feature-level LLM metrics for dashboard queries and Doris loading.
 
 ### Grouping Keys
 

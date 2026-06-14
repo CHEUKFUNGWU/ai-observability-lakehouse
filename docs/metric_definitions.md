@@ -143,11 +143,14 @@ WHERE status = 'success';
 
 95th percentile request latency.
 
+This query is for the Doris DWD fact table, where percentile computation is supported directly.
+The local Flink ADS layer does not store `p95_latency_ms`; it stores `max_latency_ms` as an upper-bound proxy because the current Flink streaming SQL path uses `MAX(latency_ms)` instead of a percentile aggregate.
+
 ### SQL
 
 ```sql
 SELECT
-    quantile(0.95)(latency_ms) AS p95_latency_ms
+    PERCENTILE_APPROX(latency_ms, 0.95) AS p95_latency_ms
 FROM ai_observability.dwd_llm_request_events
 WHERE status = 'success';
 ```

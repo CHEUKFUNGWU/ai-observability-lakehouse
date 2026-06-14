@@ -1,11 +1,11 @@
 import pytest
 
-from scripts.load_ads_metrics_to_clickhouse import qualified_table_name
+from scripts.load_ads_metrics_to_doris import qualified_table_name
 
 
 def test_qualified_table_name_accepts_safe_identifiers():
     assert qualified_table_name("ai_observability", "ads_llm_feature_daily_metrics") == (
-        "ai_observability.ads_llm_feature_daily_metrics"
+        "`ai_observability`.`ads_llm_feature_daily_metrics`"
     )
 
 

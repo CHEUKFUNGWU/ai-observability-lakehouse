@@ -1,16 +1,16 @@
 [project]
 name = "ai-observability-lakehouse-docs"
 version = "0.1.0"
-description = "AI application observability lakehouse with Spark, Flink, Paimon, ClickHouse, and Agent runtime metrics."
+description = "AI application observability lakehouse with Spark, Flink, Paimon, Doris, and Agent runtime metrics."
 authors = [
     { name = "Cheuk Fung Wu" },
 ]
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "clickhouse-connect>=1.1.1",
     "openai>=2.40.0",
     "pyarrow>=24.0.0",
+    "pymysql>=1.1.1",
     "pyspark>=4.1.2",
     "pyyaml>=6.0.2",
 ]
