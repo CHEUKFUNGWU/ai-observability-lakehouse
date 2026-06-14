@@ -19,16 +19,16 @@ The current warehouse layers are:
 ```text
 Data sources / collectors
   -> Raw JSONL files
-  -> ODS source event tables
+  -> Kafka ODS or raw landing
   -> DWD typed business event tables
-  -> ADS llm_feature_daily_metrics
-  -> ADS agent_daily_metrics
-  -> ADS agent_tool_daily_metrics
+  -> DWS llm_feature_daily_metrics
+  -> DWS agent_daily_metrics
+  -> DWS agent_tool_daily_metrics
 ```
 
 ---
 
-## 2. Source vs ODS vs DWD vs ADS
+## 2. Source vs ODS vs DWD vs DWS/ADS
 
 The mock generators and live API collectors are not warehouse layers. They are data sources.
 
@@ -36,9 +36,10 @@ The mock generators and live API collectors are not warehouse layers. They are d
 |---|---|---|
 | Source | mock generator, DeepSeek live collector, Hermes trajectory parser | Produce application/runtime events |
 | Raw | JSONL files under `data/raw/` | Local landing files for generated or collected events |
-| ODS | Parquet under `data/warehouse/ods/` | Preserve source event fields and add technical metadata |
-| DWD | Parquet under `data/warehouse/llm_request`, `agent_run`, `agent_span` | Cast types, normalize fields and apply row-level validation |
-| ADS | Parquet under `data/warehouse/ads/` | Aggregate dashboard-ready metrics |
+| ODS | Kafka topics plus selected Parquet landings under `data/warehouse/ods/` | Preserve source event fields and add technical metadata |
+| DWD | Paimon `paimon_lake.dwd.*` plus local Parquet development outputs | Cast types, normalize fields and apply row-level validation |
+| DWS | Paimon `paimon_lake.dws.*` plus local Parquet under `data/warehouse/dws/` | Reusable additive daily summaries |
+| ADS | Doris/local derived outputs under `data/warehouse/ads/` | Application-specific marts such as SLA, prompt-version, and anomaly reports |
 
 ODS deliberately does not calculate business metrics. It keeps source-aligned data stable so DWD logic can evolve without coupling directly to collectors.
 
@@ -291,7 +292,7 @@ Partitioned by `date`.
 
 ---
 
-## 8. ADS Table: llm_feature_daily_metrics
+## 8. DWS Table: llm_feature_daily_metrics
 
 ### Business Meaning
 
@@ -318,11 +319,12 @@ Daily feature-level LLM metrics for dashboard queries and Doris loading.
 | total_tokens | long | Total tokens |
 | estimated_cost_usd | double | Total estimated cost |
 | avg_latency_ms | double | Average latency |
+| max_latency_ms | long | Maximum latency or Flink upper-bound proxy |
 | p95_latency_ms | long | Approximate p95 latency |
 
 ---
 
-## 9. ADS Table: agent_daily_metrics
+## 9. DWS Table: agent_daily_metrics
 
 ### Business Meaning
 
@@ -365,7 +367,7 @@ Daily Agent-level metrics for operational dashboards. This table answers:
 
 ---
 
-## 10. ADS Table: agent_tool_daily_metrics
+## 10. DWS Table: agent_tool_daily_metrics
 
 ### Business Meaning
 

@@ -1,6 +1,6 @@
 from datetime import date
 
-from scripts.spark_build_ads_agent_tool_daily_metrics import build_agent_tool_daily_metrics
+from scripts.spark_build_dws_agent_tool_daily_metrics import build_agent_tool_daily_metrics
 
 
 def test_build_agent_tool_daily_metrics_aggregates_by_agent_and_tool(spark):

@@ -35,16 +35,16 @@ Current source adapters:
 | Mock Agent events | `scripts/generate_mock_agent_logs.py` | Raw Agent run/span JSONL |
 | Hermes trajectories | `scripts/parse_hermes_trajectories.py` | Raw Agent run/span/tool-call JSONL |
 
-Collectors and parsers are source adapters, not warehouse layers. They feed raw files or source tables, then ODS/DWD/ADS handle modeling.
+Collectors and parsers are source adapters, not warehouse layers. They feed raw files or source tables, then Kafka ODS/DWD/DWS handle modeling.
 
 ## 4. Warehouse Layers
 
 ```text
 Source adapters
   -> Raw JSONL or Postgres source table
-  -> ODS source event tables
+  -> Kafka ODS or raw landing
   -> DWD typed fact tables
-  -> ADS dashboard metric tables
+  -> DWS reusable summary tables and ADS marts
   -> Doris serving tables
 ```
 
@@ -53,7 +53,8 @@ Source adapters
 | Raw | Local landing files for generated, collected or parsed source events |
 | ODS | Preserve source fields and add ingestion metadata |
 | DWD | Normalize data types, validate facts and remove oversized raw text where appropriate |
-| ADS | Store additive daily metrics for dashboards |
+| DWS | Store reusable additive daily metrics for dashboards and downstream marts |
+| ADS | Store application-specific derived tables such as SLA, prompt-version, and anomaly outputs |
 | Doris | Serve OLAP queries and support percentile calculation from DWD detail tables |
 
 ## 5. Dashboard Questions
@@ -91,7 +92,7 @@ Implemented DWD facts:
 - `agent_span_events`
 - `agent_tool_call_events`
 
-Implemented ADS metrics:
+Implemented DWS metrics:
 
 - `llm_feature_daily_metrics`
 - `agent_daily_metrics`
@@ -103,9 +104,9 @@ Implemented Doris serving tables:
 - `dwd_agent_run_events`
 - `dwd_agent_span_events`
 - `dwd_agent_tool_call_events`
-- `ads_llm_feature_daily_metrics`
-- `ads_agent_daily_metrics`
-- `ads_agent_tool_daily_metrics`
+- `dws_llm_feature_daily_metrics`
+- `dws_agent_daily_metrics`
+- `dws_agent_tool_daily_metrics`
 
 ## 7. Product Value
 
@@ -119,7 +120,7 @@ For data teams:
 
 - Maintain a generic AI observability subject domain instead of a Dify-specific workflow model.
 - Separate source adapters from warehouse layers.
-- Keep ADS tables additive and derive rates in query/dashboard layers.
+- Keep DWS tables additive and derive rates in query/dashboard layers.
 
 For product and operations teams:
 

@@ -14,16 +14,17 @@ scripts/run_flink_sql_sequence.sh \
   flink/sql/01_source_postgres_cdc.sql \
   flink/sql/02_ods_kafka_tables.sql \
   flink/sql/03_dwd_paimon_tables.sql \
-  flink/sql/04_ads_paimon_tables.sql \
+  flink/sql/04_dws_paimon_tables.sql \
   flink/sql/10_ingest_ods_to_kafka.sql \
   flink/sql/20_build_dwd_from_kafka_ods.sql \
-  flink/sql/30_build_ads_from_dwd.sql
+  flink/sql/30_build_dws_from_dwd.sql
 
-uv run python -m scripts.run_local_batch_pipeline --count "${1:-100}" --seed 42
 uv run python -m scripts.spark_build_ads_cost_anomaly
 uv run python -m scripts.spark_build_ads_prompt_version_metrics
 uv run python -m scripts.spark_build_dim_model
 docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root < sql/create_doris_tables.sql
-uv run python -m scripts.load_ads_metrics_to_doris
+docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root < sql/doris_create_paimon_catalog.sql
+docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root < sql/doris_sync_paimon_dws.sql
+uv run python -m scripts.load_dws_metrics_to_doris
 printf '\nDashboard query preview:\n'
 sed -n '1,120p' sql/doris_dashboard_queries.sql

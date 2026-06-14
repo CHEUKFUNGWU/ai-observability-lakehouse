@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 import pytest
 
-from scripts.spark_build_ads_llm_feature_daily_metrics import build_feature_daily_metrics
+from scripts.spark_build_dws_llm_feature_daily_metrics import build_feature_daily_metrics
 
 
 def make_dwd_events(spark):
@@ -145,4 +145,5 @@ def test_build_feature_daily_metrics_aggregates_latency(spark):
     chat = rows["chat"]
 
     assert chat["avg_latency_ms"] == 200.0
+    assert chat["max_latency_ms"] == 300
     assert chat["p95_latency_ms"] == 300

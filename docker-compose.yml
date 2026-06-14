@@ -128,6 +128,7 @@ services:
       BE_ADDR: "doris-be:9050"
     volumes:
       - doris_be_data:/opt/apache-doris/be/storage
+      - paimon_warehouse:/workspace/data/paimon:ro
     depends_on:
       - doris-fe
 

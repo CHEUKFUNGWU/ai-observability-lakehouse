@@ -10,10 +10,10 @@ scripts/run_flink_sql_sequence.sh \
   flink/sql/01_source_postgres_cdc.sql \
   flink/sql/02_ods_kafka_tables.sql \
   flink/sql/03_dwd_paimon_tables.sql \
-  flink/sql/04_ads_paimon_tables.sql \
+  flink/sql/04_dws_paimon_tables.sql \
   flink/sql/10_ingest_ods_to_kafka.sql \
   flink/sql/20_build_dwd_from_kafka_ods.sql \
-  flink/sql/30_build_ads_from_dwd.sql
+  flink/sql/30_build_dws_from_dwd.sql
 
 uv run python -m scripts.generate_mock_llm_logs --count 100 --seed 42
 scripts/load_llm_jsonl_to_postgres_source.sh data/raw/mock_llm_requests/events.jsonl

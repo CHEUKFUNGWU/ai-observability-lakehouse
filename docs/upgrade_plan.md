@@ -1,11 +1,13 @@
 # AI Observability Lakehouse — Upgrade Plan
 
+> Historical note: the upgrade items in this document predate the architecture unification work. The current repository state now uses a shared Paimon DWD/DWS warehouse, Spark backfill/validation instead of a parallel batch warehouse, and Doris as the serving layer.
+
 ## Current State
 
 The project implements a stream-batch AI observability lakehouse with:
 
-- **Batch path:** JSONL → Spark → Parquet (ODS → DWD → ADS) → Doris
-- **Streaming path:** Postgres → Flink CDC → Paimon (ODS → DWD → ADS)
+- **Batch path:** JSONL → Spark backfill/validation → Paimon (DWD → DWS) → Doris
+- **Streaming path:** Postgres → Flink CDC → Kafka ODS → Paimon (DWD → DWS)
 - **Serving layer:** Doris DUPLICATE KEY tables + dashboard queries
 - **Domain model:** LLMRequestEvent, AgentRunEvent, AgentSpanEvent, AgentToolCallEvent
 - **Test coverage:** 52 tests, all passing
@@ -14,15 +16,14 @@ The project implements a stream-batch AI observability lakehouse with:
 
 ```text
                     Real-time Path
-PG ──► Flink CDC ──► Kafka (ODS) ──► Flink SQL ──► Paimon (DWD/ADS)
+PG ──► Flink CDC ──► Kafka (ODS) ──► Flink SQL ──► Paimon (DWD/DWS)
+JSONL ──► Spark Backfill / Validation ────────────────┘
                                                          │
                                                          ▼
-                    Batch Path                      Doris ──► Dashboard
-JSONL ──► Spark ──► Parquet (ODS → DWD → ADS) ──────────┘
-                         │
-                         ▼
-                   Data Quality
-                   Quarantine Table
+                                                     Doris ──► Dashboard
+                                                         │
+                                                         ▼
+                                                   Quarantine Table
 ```
 
 With: Kafka ODS layer, data quality framework, dimensional modeling, cost anomaly detection, SLA monitoring, CI/CD, ADRs, and performance benchmarks.
@@ -112,7 +113,7 @@ CREATE TABLE IF NOT EXISTS kafka_ods_llm_request_events (
 
 **Delete:** `flink/sql/90_verify_ods_count.sql` (Kafka topics are not batch-scannable)
 
-**Unchanged:** `03_dwd_paimon_tables.sql`, `04_ads_paimon_tables.sql`, `30_build_ads_from_dwd.sql`, `91_verify_dwd_count.sql`, `92_verify_ads_metrics.sql`
+**Unchanged:** `03_dwd_paimon_tables.sql`, `04_dws_paimon_tables.sql`, `30_build_dws_from_dwd.sql`, `91_verify_dwd_count.sql`, `92_verify_dws_metrics.sql`
 
 ### 1.5 Optional: Kafka Topic Pre-Creation Script
 
@@ -159,10 +160,10 @@ scripts/run_flink_sql_sequence.sh \
   flink/sql/01_source_postgres_cdc.sql \
   flink/sql/02_ods_kafka_tables.sql \
   flink/sql/03_dwd_paimon_tables.sql \
-  flink/sql/04_ads_paimon_tables.sql \
+  flink/sql/04_dws_paimon_tables.sql \
   flink/sql/10_ingest_ods_to_kafka.sql \
   flink/sql/20_build_dwd_from_kafka_ods.sql \
-  flink/sql/30_build_ads_from_dwd.sql
+  flink/sql/30_build_dws_from_dwd.sql
 scripts/run_flink_sql_file.sh flink/sql/91_verify_dwd_count.sql
 uv run pytest
 ```
@@ -219,7 +220,7 @@ lint:
 	uv run ruff check .
 
 pipeline:
-	uv run python -m scripts.run_local_batch_pipeline --count 1000 --seed 42
+	uv run python -m scripts.spark_paimon_backfill --count 1000 --seed 42
 
 flink-up:
 	docker compose up -d postgres kafka flink-jobmanager flink-taskmanager
@@ -237,7 +238,7 @@ clean:
 
 **File:** `docker-compose.yml` — add `doris-fe`, `doris-be`, and `doris-init` services.
 
-**File:** `scripts/load_ads_metrics_to_doris.py` — default to Doris FE on port `9030`.
+**File:** `scripts/load_dws_metrics_to_doris.py` — default to Doris FE on port `9030`.
 
 **Note:** the local Docker demo uses the default `root` account without a password unless you harden Doris further.
 
@@ -309,7 +310,7 @@ log_info(LOGGER, "dwd_llm_events_validated", valid=valid_count, quarantine=quara
 
 ### 3.3 Remove Redundant `count_invalid_token_totals()`
 
-This function is now superseded by the DQ framework. Remove from `spark_transform_llm_events.py` and `run_local_batch_pipeline.py`. Update tests.
+This function is now superseded by the DQ framework. Remove from `spark_transform_llm_events.py` and `spark_paimon_backfill.py`. Update tests.
 
 ### 3.4 Add Tests
 
@@ -324,7 +325,7 @@ This function is now superseded by the DQ framework. Remove from `spark_transfor
 
 ```bash
 uv run pytest tests/test_data_quality.py
-uv run python -m scripts.run_local_batch_pipeline --count 100 --seed 42
+uv run python -m scripts.spark_paimon_backfill --count 100 --seed 42
 ```
 
 ---
@@ -382,7 +383,7 @@ Extract unique agents from DWD `agent_run_events` and build a `dim_agent` table 
 
 **File:** `sql/doris_dashboard_queries.sql`
 
-Add a query that joins `ads_llm_feature_daily_metrics` with `dim_model` to show cost per model with pricing metadata:
+Add a query that joins `dws_llm_feature_daily_metrics` with `dim_model` to show cost per model with pricing metadata:
 
 ```sql
 SELECT
@@ -394,7 +395,7 @@ SELECT
     a.estimated_cost_usd
 FROM (
     SELECT model_name, sum(request_count) AS request_count, sum(total_tokens) AS total_tokens, sum(estimated_cost_usd) AS estimated_cost_usd
-    FROM ai_observability.ads_llm_feature_daily_metrics
+    FROM ai_observability.dws_llm_feature_daily_metrics
     GROUP BY model_name
 ) a
 JOIN ai_observability.dim_model m ON a.model_name = m.model_name
@@ -418,7 +419,7 @@ uv run python -m scripts.spark_build_dim_model
 
 **Create:** `scripts/spark_build_ads_cost_anomaly.py`
 
-Using a window function over `ads_llm_feature_daily_metrics`:
+Using a window function over `dws_llm_feature_daily_metrics`:
 
 ```python
 window = Window.partitionBy("app_name", "feature_name", "model_name").orderBy("date")
@@ -470,7 +471,7 @@ This lets you compare v1 vs v2 of the same prompt on the same model.
 
 ```bash
 uv run pytest
-uv run python -m scripts.run_local_batch_pipeline --count 1000 --seed 42
+uv run python -m scripts.spark_paimon_backfill --count 1000 --seed 42
 uv run python -m scripts.spark_build_ads_cost_anomaly
 ```
 
@@ -510,7 +511,7 @@ SELECT
     SUM(error_count) AS error_count,
     SUM(total_tokens) AS total_tokens,
     SUM(estimated_cost_usd) AS estimated_cost_usd
-FROM ai_observability.ads_llm_feature_daily_metrics
+FROM ai_observability.dws_llm_feature_daily_metrics
 GROUP BY `date`;
 ```
 
@@ -536,7 +537,7 @@ After each Spark script runs, log a row to `data/warehouse/pipeline_runs.jsonl`:
 
 ### 6.4 Fix Agent ADS Join Fan-Out
 
-**File:** `scripts/spark_build_ads_agent_daily_metrics.py`
+**File:** `scripts/spark_build_dws_agent_daily_metrics.py`
 
 The span_metrics join key `["date", "agent_id"]` is narrower than the run_metrics key `["date", "app_name", "agent_id", "agent_name", "task_type"]`. This duplicates span counts across task types.
 
@@ -546,7 +547,7 @@ Fix: add a comment documenting this as a known limitation, or restructure so spa
 
 For consistency with the LLM ADS design (rates derived at query time, not stored), remove `span_failure_rate` from:
 
-- `scripts/spark_build_ads_agent_daily_metrics.py`
+- `scripts/spark_build_dws_agent_daily_metrics.py`
 - `sql/create_doris_tables.sql`
 
 Derive at query time: `failed_span_count / span_count AS span_failure_rate`.
@@ -555,7 +556,7 @@ Derive at query time: `failed_span_count / span_count AS span_failure_rate`.
 
 ```bash
 uv run pytest
-uv run python -m scripts.run_local_batch_pipeline --count 10000 --seed 42
+uv run python -m scripts.spark_paimon_backfill --count 10000 --seed 42
 ```
 
 ---
@@ -654,11 +655,11 @@ scripts/run_benchmark.py
 | Phase | New Files | Modified Files | Deleted Files |
 |---|---|---|---|
 | 1 | `flink/sql/02_ods_kafka_tables.sql`, `scripts/create_kafka_topics.sh` | `docker-compose.yml`, `docker/flink/Dockerfile`, `flink/sql/10_*.sql`, `flink/sql/20_*.sql`, `tests/test_flink_sql_assets.py`, `README.md`, `docs/stream_batch_platform.md`, `docs/technical_document.md` | `flink/sql/02_ods_paimon_tables.sql`, `flink/sql/90_verify_ods_count.sql` |
-| 2 | `.github/workflows/ci.yml`, `Makefile`, `scripts/run_full_demo.sh` | `scripts/spark_utils.py`, `config/doris/init_fe.sh`, `docker-compose.yml`, `scripts/load_ads_metrics_to_doris.py` | |
-| 3 | `app/data_quality.py`, `tests/test_data_quality.py` | `scripts/spark_transform_llm_events.py`, `scripts/run_local_batch_pipeline.py` | |
+| 2 | `.github/workflows/ci.yml`, `Makefile`, `scripts/run_full_demo.sh` | `scripts/spark_utils.py`, `config/doris/init_fe.sh`, `docker-compose.yml`, `scripts/load_dws_metrics_to_doris.py` | |
+| 3 | `app/data_quality.py`, `tests/test_data_quality.py` | `scripts/spark_transform_llm_events.py`, `scripts/spark_paimon_backfill.py` | |
 | 4 | `app/dim_model.py`, `scripts/spark_build_dim_model.py` | `sql/create_doris_tables.sql`, `sql/doris_dashboard_queries.sql` | |
 | 5 | `scripts/spark_build_ads_cost_anomaly.py`, `scripts/spark_build_ads_sla_daily.py`, `scripts/spark_build_ads_prompt_version_metrics.py`, `config/sla_rules.yaml` | `sql/create_doris_tables.sql` | |
-| 6 | `app/pipeline_metadata.py` | `scripts/spark_transform_llm_events.py`, `scripts/spark_build_ads_agent_daily_metrics.py`, `sql/create_doris_tables.sql` | |
+| 6 | `app/pipeline_metadata.py` | `scripts/spark_transform_llm_events.py`, `scripts/spark_build_dws_agent_daily_metrics.py`, `sql/create_doris_tables.sql` | |
 | 7 | `docs/adr/*.md`, `scripts/run_benchmark.py`, `scripts/test_flink_failover.sh`, `docs/benchmark_results.md`, `docs/failover_test_report.md`, `docs/data_lineage.md` | | |
 
 ---

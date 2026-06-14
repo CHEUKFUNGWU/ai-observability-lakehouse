@@ -7,7 +7,7 @@ lint:
 	uv run ruff check .
 
 pipeline:
-	uv run python -m scripts.run_local_batch_pipeline --count 1000 --seed 42
+	uv run python -m scripts.spark_paimon_backfill --input data/raw/mock_llm_requests/events.jsonl
 
 flink-up:
 	docker compose up -d postgres kafka flink-jobmanager flink-taskmanager

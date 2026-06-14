@@ -9,7 +9,7 @@ from scripts.spark_utils import build_spark_session
 
 
 DEFAULT_INPUT_PATH = Path("data/warehouse/llm_request/events.parquet")
-DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/llm_feature_daily_metrics.parquet")
+DEFAULT_OUTPUT_PATH = Path("data/warehouse/dws/llm_feature_daily_metrics.parquet")
 LOGGER = get_logger(__name__)
 
 
@@ -27,11 +27,12 @@ def build_feature_daily_metrics(events: DataFrame) -> DataFrame:
         F.sum("total_tokens").alias("total_tokens"),
         F.sum("estimated_cost_usd").alias("estimated_cost_usd"),
         F.round(F.avg("latency_ms"), 2).alias("avg_latency_ms"),
+        F.max("latency_ms").alias("max_latency_ms"),
         F.expr("percentile_approx(latency_ms, 0.95)").alias("p95_latency_ms"),
     )
 
 
-def write_ads_metrics(metrics: DataFrame, output_path: Path) -> None:
+def write_dws_metrics(metrics: DataFrame, output_path: Path) -> None:
     metrics.write.mode("overwrite").partitionBy("date").parquet(str(output_path))
 
 
@@ -42,26 +43,26 @@ def main() -> None:
     parser.add_argument("--show-input-sample", action="store_true")
     args = parser.parse_args()
 
-    spark = build_spark_session("ai-observability-ads-feature-daily-metrics")
+    spark = build_spark_session("ai-observability-dws-feature-daily-metrics")
 
     try:
         events = load_dwd_events(spark, args.input)
         metrics = build_feature_daily_metrics(events)
 
-        log_info(LOGGER, "ads_llm_input_loaded", input=str(args.input), rows=events.count())
+        log_info(LOGGER, "dws_llm_input_loaded", input=str(args.input), rows=events.count())
         if args.show_input_sample:
             events.printSchema()
             events.show(5, truncate=False)
 
         metric_rows = metrics.count()
-        log_info(LOGGER, "ads_llm_metrics_built", rows=metric_rows)
+        log_info(LOGGER, "dws_llm_metrics_built", rows=metric_rows)
         metrics.orderBy("date", "app_name", "feature_name", "model_name").show(truncate=False)
 
-        write_ads_metrics(metrics, args.output)
-        log_info(LOGGER, "ads_llm_metrics_written", output=str(args.output))
+        write_dws_metrics(metrics, args.output)
+        log_info(LOGGER, "dws_llm_metrics_written", output=str(args.output))
 
         written_metrics = spark.read.parquet(str(args.output))
-        log_info(LOGGER, "ads_llm_metrics_verified", rows=written_metrics.count())
+        log_info(LOGGER, "dws_llm_metrics_verified", rows=written_metrics.count())
 
     finally:
         spark.stop()

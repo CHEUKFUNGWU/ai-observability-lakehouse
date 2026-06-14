@@ -6,11 +6,11 @@ from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
 from app.pipeline_metadata import append_pipeline_run
-from scripts.spark_utils import build_spark_session
+from scripts.spark_utils import build_paimon_spark_session
 
-DEFAULT_INPUT_PATH = Path("data/warehouse/ads/llm_feature_daily_metrics.parquet")
 DEFAULT_RULES_PATH = Path("config/sla_rules.yaml")
 DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/sla_daily_report.parquet")
+DEFAULT_INPUT_TABLE = "paimon_lake.dws.llm_feature_daily_metrics"
 LOGGER = get_logger(__name__)
 
 
@@ -35,7 +35,7 @@ def build_sla_daily_report(metrics, rules):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
+    parser.add_argument("--input-table", type=str, default=DEFAULT_INPUT_TABLE)
     parser.add_argument("--rules", type=Path, default=DEFAULT_RULES_PATH)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     args = parser.parse_args()
@@ -43,9 +43,9 @@ def main() -> None:
     from datetime import datetime, timezone
 
     started_at = datetime.now(timezone.utc)
-    spark = build_spark_session("ai-observability-ads-sla-daily")
+    spark = build_paimon_spark_session("ai-observability-ads-sla-daily")
     try:
-        metrics = spark.read.parquet(str(args.input))
+        metrics = spark.table(args.input_table)
         rules = load_rules(args.rules)
         report = build_sla_daily_report(metrics, rules)
         report.write.mode("overwrite").partitionBy("date").parquet(str(args.output))

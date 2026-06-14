@@ -9,7 +9,7 @@ from scripts.spark_utils import build_spark_session
 
 
 DEFAULT_INPUT_PATH = Path("data/warehouse/agent_tool_call/events.parquet")
-DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/agent_tool_daily_metrics.parquet")
+DEFAULT_OUTPUT_PATH = Path("data/warehouse/dws/agent_tool_daily_metrics.parquet")
 LOGGER = get_logger(__name__)
 
 
@@ -30,7 +30,7 @@ def build_agent_tool_daily_metrics(tool_calls: DataFrame) -> DataFrame:
     )
 
 
-def write_ads_metrics(metrics: DataFrame, output_path: Path) -> None:
+def write_dws_metrics(metrics: DataFrame, output_path: Path) -> None:
     metrics.write.mode("overwrite").partitionBy("date").parquet(str(output_path))
 
 
@@ -40,12 +40,12 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     args = parser.parse_args()
 
-    spark = build_spark_session("ai-observability-ads-agent-tool-daily-metrics")
+    spark = build_spark_session("ai-observability-dws-agent-tool-daily-metrics")
     try:
         tool_calls = load_tool_calls(spark, args.input)
         metrics = build_agent_tool_daily_metrics(tool_calls)
-        write_ads_metrics(metrics, args.output)
-        log_info(LOGGER, "ads_agent_tool_daily_metrics_written", output=str(args.output), rows=metrics.count())
+        write_dws_metrics(metrics, args.output)
+        log_info(LOGGER, "dws_agent_tool_daily_metrics_written", output=str(args.output), rows=metrics.count())
     finally:
         spark.stop()
 

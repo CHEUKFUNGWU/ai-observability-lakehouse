@@ -9,7 +9,7 @@ Postgres operational source tables
   -> Flink CDC source tables
   -> Kafka ODS table
   -> Paimon DWD tables
-  -> Paimon ADS tables
+  -> Paimon DWS tables
 ```
 
 ## SQL Execution Order
@@ -19,10 +19,10 @@ sql/00_catalogs.sql
 sql/01_source_postgres_cdc.sql
 sql/02_ods_kafka_tables.sql
 sql/03_dwd_paimon_tables.sql
-sql/04_ads_paimon_tables.sql
+sql/04_dws_paimon_tables.sql
 sql/10_ingest_ods_to_kafka.sql
 sql/20_build_dwd_from_kafka_ods.sql
-sql/30_build_ads_from_dwd.sql
+sql/30_build_dws_from_dwd.sql
 ```
 
 ## Local Runtime
@@ -62,9 +62,9 @@ scripts/run_flink_sql_file.sh flink/sql/00_catalogs.sql
 
 The runner starts the dedicated `flink-sql-client` service with `docker compose run --rm`, matching the Apache Flink session-cluster deployment pattern. The JobManager and TaskManager containers remain the long-running cluster; SQL Client is only used to submit SQL statements.
 
-The local TaskManager is configured with four slots so the Kafka ingestion, DWD, and ADS streaming jobs can keep running while batch verification queries use the remaining capacity.
+The local TaskManager is configured with four slots so the Kafka ingestion, DWD, and DWS streaming jobs can keep running while batch verification queries use the remaining capacity.
 
-The Flink ADS SQL stores `max_latency_ms` as an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate.
+The Flink DWS SQL stores `max_latency_ms` as an explicit upper-bound metric and writes `p95_latency_ms = 0` because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate.
 
 Run the SQL files in the order listed above. Long-running `INSERT INTO ... SELECT ...` statements are streaming jobs and should remain visible in the Flink Web UI.
 
@@ -76,7 +76,7 @@ The SQL uses:
 - `kafka` connector for the real-time ODS buffer
 - `paimon` catalog for lakehouse tables
 - primary keys on CDC-backed DWD tables
-- partitioned ADS tables for dashboard-friendly metrics
+- partitioned DWS tables for reusable summary metrics
 
 Connector jars are not vendored in this repository. The local Flink image downloads compatible jars during Docker build:
 

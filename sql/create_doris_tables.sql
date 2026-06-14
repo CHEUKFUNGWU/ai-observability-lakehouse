@@ -4,9 +4,9 @@ DROP TABLE IF EXISTS ai_observability.dwd_llm_request_events;
 DROP TABLE IF EXISTS ai_observability.dwd_agent_run_events;
 DROP TABLE IF EXISTS ai_observability.dwd_agent_span_events;
 DROP TABLE IF EXISTS ai_observability.dwd_agent_tool_call_events;
-DROP TABLE IF EXISTS ai_observability.ads_llm_feature_daily_metrics;
-DROP TABLE IF EXISTS ai_observability.ads_agent_daily_metrics;
-DROP TABLE IF EXISTS ai_observability.ads_agent_tool_daily_metrics;
+DROP TABLE IF EXISTS ai_observability.dws_llm_feature_daily_metrics;
+DROP TABLE IF EXISTS ai_observability.dws_agent_daily_metrics;
+DROP TABLE IF EXISTS ai_observability.dws_agent_tool_daily_metrics;
 DROP TABLE IF EXISTS ai_observability.dim_model;
 DROP TABLE IF EXISTS ai_observability.ads_cost_anomaly_daily;
 DROP TABLE IF EXISTS ai_observability.ads_sla_daily_report;
@@ -193,7 +193,7 @@ PROPERTIES (
     "dynamic_partition.create_history_partition" = "true"
 );
 
-CREATE TABLE IF NOT EXISTS ai_observability.ads_llm_feature_daily_metrics
+CREATE TABLE IF NOT EXISTS ai_observability.dws_llm_feature_daily_metrics
 (
     `date` DATE NOT NULL,
     app_name VARCHAR(256) NOT NULL,
@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS ai_observability.ads_llm_feature_daily_metrics
     total_tokens BIGINT NOT NULL,
     estimated_cost_usd DOUBLE NOT NULL,
     avg_latency_ms DOUBLE NOT NULL,
+    max_latency_ms BIGINT NOT NULL,
     p95_latency_ms BIGINT NOT NULL
 )
 DUPLICATE KEY(`date`, app_name, feature_name, model_name)
@@ -240,7 +241,7 @@ PROPERTIES (
     "enable_unique_key_merge_on_write" = "true"
 );
 
-CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_daily_metrics
+CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_daily_metrics
 (
     `date` DATE NOT NULL,
     app_name VARCHAR(256) NOT NULL,
@@ -277,7 +278,7 @@ PROPERTIES (
     "dynamic_partition.create_history_partition" = "true"
 );
 
-CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_tool_daily_metrics
+CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_tool_daily_metrics
 (
     `date` DATE NOT NULL,
     agent_id VARCHAR(128) NOT NULL,
@@ -402,5 +403,5 @@ SELECT
     SUM(error_count) AS error_count,
     SUM(total_tokens) AS total_tokens,
     SUM(estimated_cost_usd) AS estimated_cost_usd
-FROM ai_observability.ads_llm_feature_daily_metrics
+FROM ai_observability.dws_llm_feature_daily_metrics
 GROUP BY `date`;

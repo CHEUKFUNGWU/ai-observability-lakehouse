@@ -6,10 +6,10 @@ from pyspark.sql import Window
 
 from app.logging_utils import get_logger, log_info
 from app.pipeline_metadata import append_pipeline_run
-from scripts.spark_utils import build_spark_session
+from scripts.spark_utils import build_paimon_spark_session
 
-DEFAULT_INPUT_PATH = Path("data/warehouse/ads/llm_feature_daily_metrics.parquet")
 DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/cost_anomaly_daily.parquet")
+DEFAULT_INPUT_TABLE = "paimon_lake.dws.llm_feature_daily_metrics"
 LOGGER = get_logger(__name__)
 
 
@@ -30,16 +30,16 @@ def build_cost_anomaly_metrics(metrics):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
+    parser.add_argument("--input-table", type=str, default=DEFAULT_INPUT_TABLE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     args = parser.parse_args()
 
     from datetime import datetime, timezone
 
     started_at = datetime.now(timezone.utc)
-    spark = build_spark_session("ai-observability-ads-cost-anomaly")
+    spark = build_paimon_spark_session("ai-observability-ads-cost-anomaly")
     try:
-        metrics = spark.read.parquet(str(args.input))
+        metrics = spark.table(args.input_table)
         result = build_cost_anomaly_metrics(metrics)
         result.write.mode("overwrite").partitionBy("date").parquet(str(args.output))
         row_count = result.count()

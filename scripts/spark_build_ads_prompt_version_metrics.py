@@ -5,10 +5,10 @@ from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
 from app.pipeline_metadata import append_pipeline_run
-from scripts.spark_utils import build_spark_session
+from scripts.spark_utils import build_paimon_spark_session
 
-DEFAULT_INPUT_PATH = Path("data/warehouse/llm_request/events.parquet")
 DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/prompt_version_daily_metrics.parquet")
+DEFAULT_INPUT_TABLE = "paimon_lake.dwd.llm_request_events"
 LOGGER = get_logger(__name__)
 
 
@@ -24,16 +24,16 @@ def build_prompt_version_metrics(events):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT_PATH)
+    parser.add_argument("--input-table", type=str, default=DEFAULT_INPUT_TABLE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     args = parser.parse_args()
 
     from datetime import datetime, timezone
 
     started_at = datetime.now(timezone.utc)
-    spark = build_spark_session("ai-observability-ads-prompt-version")
+    spark = build_paimon_spark_session("ai-observability-ads-prompt-version")
     try:
-        events = spark.read.parquet(str(args.input))
+        events = spark.table(args.input_table)
         result = build_prompt_version_metrics(events)
         result.write.mode("overwrite").partitionBy("date").parquet(str(args.output))
         row_count = result.count()

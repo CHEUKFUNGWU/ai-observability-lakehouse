@@ -11,9 +11,9 @@ def test_doris_schema_defines_llm_agent_and_tool_tables():
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_run_events" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_span_events" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_tool_call_events" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_llm_feature_daily_metrics" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_daily_metrics" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_tool_daily_metrics" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_llm_feature_daily_metrics" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_daily_metrics" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_tool_daily_metrics" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_model" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_cost_anomaly_daily" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_sla_daily_report" in sql
@@ -31,11 +31,22 @@ def test_doris_schema_uses_date_column_consistently():
 def test_primary_ads_fact_tables_do_not_store_derived_rates():
     sql = (REPO_ROOT / "sql" / "create_doris_tables.sql").read_text(encoding="utf-8")
 
-    llm_section = sql.split("CREATE TABLE IF NOT EXISTS ai_observability.ads_llm_feature_daily_metrics", 1)[1]
+    llm_section = sql.split("CREATE TABLE IF NOT EXISTS ai_observability.dws_llm_feature_daily_metrics", 1)[1]
     llm_section = llm_section.split("CREATE TABLE IF NOT EXISTS ai_observability.dim_model", 1)[0]
-    agent_section = sql.split("CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_daily_metrics", 1)[1]
-    agent_section = agent_section.split("CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_tool_daily_metrics", 1)[0]
+    agent_section = sql.split("CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_daily_metrics", 1)[1]
+    agent_section = agent_section.split("CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_tool_daily_metrics", 1)[0]
 
     assert "success_rate" not in llm_section
     assert "error_rate" not in llm_section
     assert "span_failure_rate" not in agent_section
+    assert "max_latency_ms BIGINT NOT NULL" in llm_section
+
+
+def test_doris_paimon_catalog_sql_assets_exist():
+    catalog_sql = (REPO_ROOT / "sql" / "doris_create_paimon_catalog.sql").read_text(encoding="utf-8")
+    sync_sql = (REPO_ROOT / "sql" / "doris_sync_paimon_dws.sql").read_text(encoding="utf-8")
+
+    assert "'type' = 'paimon'" in catalog_sql
+    assert "warehouse' = 'file:///workspace/data/paimon'" in catalog_sql
+    assert "INSERT INTO ai_observability.dws_llm_feature_daily_metrics" in sync_sql
+    assert "FROM paimon_lake.dws.llm_feature_daily_metrics" in sync_sql

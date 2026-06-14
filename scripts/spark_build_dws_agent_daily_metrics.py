@@ -6,13 +6,12 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
-from app.pipeline_metadata import append_pipeline_run
 from scripts.spark_utils import build_spark_session
 
 
 DEFAULT_RUN_INPUT_PATH = Path("data/warehouse/agent_run/events.parquet")
 DEFAULT_SPAN_INPUT_PATH = Path("data/warehouse/agent_span/events.parquet")
-DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/agent_daily_metrics.parquet")
+DEFAULT_OUTPUT_PATH = Path("data/warehouse/dws/agent_daily_metrics.parquet")
 LOGGER = get_logger(__name__)
 
 
@@ -70,7 +69,7 @@ def build_agent_daily_metrics(runs: DataFrame, spans: DataFrame) -> DataFrame:
     )
 
 
-def write_ads_metrics(metrics: DataFrame, output_path: Path) -> None:
+def write_dws_metrics(metrics: DataFrame, output_path: Path) -> None:
     metrics.write.mode("overwrite").partitionBy("date").parquet(str(output_path))
 
 
@@ -81,23 +80,14 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     args = parser.parse_args()
 
-    spark = build_spark_session("ai-observability-ads-agent-daily-metrics")
-    started_at = datetime.now(timezone.utc)
+    spark = build_spark_session("ai-observability-dws-agent-daily-metrics")
     try:
         runs = load_events(spark, args.run_input)
         spans = load_events(spark, args.span_input)
         metrics = build_agent_daily_metrics(runs, spans)
-        write_ads_metrics(metrics, args.output)
+        write_dws_metrics(metrics, args.output)
         row_count = metrics.count()
-        log_info(LOGGER, "ads_agent_daily_metrics_written", output=str(args.output), rows=row_count)
-        append_pipeline_run(
-            pipeline_name="spark_build_ads_agent_daily_metrics",
-            layer="ads",
-            start_time=started_at,
-            end_time=datetime.now(timezone.utc),
-            input_rows=runs.count() + spans.count(),
-            output_rows=row_count,
-        )
+        log_info(LOGGER, "dws_agent_daily_metrics_written", output=str(args.output), rows=row_count)
     finally:
         spark.stop()
 

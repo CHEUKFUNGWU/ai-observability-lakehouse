@@ -1,6 +1,6 @@
 -- Build daily feature metrics from DWD.
 
-INSERT INTO paimon_lake.ads.llm_feature_daily_metrics
+INSERT INTO paimon_lake.dws.llm_feature_daily_metrics
 SELECT
     `date`,
     app_name,
@@ -16,6 +16,7 @@ SELECT
     AVG(latency_ms) AS avg_latency_ms,
     -- Flink 1.20 SQL does not support PERCENTILE_CONT as a streaming aggregate.
     -- Store an explicit upper-bound metric instead of naming MAX latency as p95.
-    CAST(MAX(latency_ms) AS DOUBLE) AS max_latency_ms
+    CAST(MAX(latency_ms) AS BIGINT) AS max_latency_ms,
+    CAST(0 AS BIGINT) AS p95_latency_ms
 FROM paimon_lake.dwd.llm_request_events
 GROUP BY `date`, app_name, feature_name, model_name;

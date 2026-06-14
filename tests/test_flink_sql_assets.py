@@ -10,12 +10,12 @@ EXPECTED_FLINK_SQL_FILES = [
     "01_source_postgres_cdc.sql",
     "02_ods_kafka_tables.sql",
     "03_dwd_paimon_tables.sql",
-    "04_ads_paimon_tables.sql",
+    "04_dws_paimon_tables.sql",
     "10_ingest_ods_to_kafka.sql",
     "20_build_dwd_from_kafka_ods.sql",
-    "30_build_ads_from_dwd.sql",
+    "30_build_dws_from_dwd.sql",
     "91_verify_dwd_count.sql",
-    "92_verify_ads_metrics.sql",
+    "92_verify_dws_metrics.sql",
 ]
 
 
@@ -36,7 +36,7 @@ def test_catalog_sql_defines_paimon_lake():
     assert "'type' = 'paimon'" in sql
     assert "CREATE DATABASE IF NOT EXISTS paimon_lake.ods" in sql
     assert "CREATE DATABASE IF NOT EXISTS paimon_lake.dwd" in sql
-    assert "CREATE DATABASE IF NOT EXISTS paimon_lake.ads" in sql
+    assert "CREATE DATABASE IF NOT EXISTS paimon_lake.dws" in sql
 
 
 def test_source_sql_uses_postgres_cdc_connector():
@@ -53,44 +53,62 @@ def test_source_sql_uses_postgres_cdc_connector():
 def test_paimon_layers_use_expected_tables():
     ods_sql = read_asset("flink/sql/02_ods_kafka_tables.sql")
     dwd_sql = read_asset("flink/sql/03_dwd_paimon_tables.sql")
-    ads_sql = read_asset("flink/sql/04_ads_paimon_tables.sql")
+    dws_sql = read_asset("flink/sql/04_dws_paimon_tables.sql")
 
     assert "kafka_ods_llm_request_events" in ods_sql
     assert "'connector' = 'kafka'" in ods_sql
     assert "paimon_lake.dwd.llm_request_events" in dwd_sql
-    assert "paimon_lake.ads.llm_feature_daily_metrics" in ads_sql
+    assert "paimon_lake.dws.llm_feature_daily_metrics" in dws_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in dwd_sql
-    assert "PARTITIONED BY (`date`)" in ads_sql
+    assert "PARTITIONED BY (`date`)" in dws_sql
 
 
 def test_flink_sql_layer_dependencies_are_explicit():
     ingest_sql = read_asset("flink/sql/10_ingest_ods_to_kafka.sql")
     dwd_sql = read_asset("flink/sql/20_build_dwd_from_kafka_ods.sql")
-    ads_sql = read_asset("flink/sql/30_build_ads_from_dwd.sql")
+    dws_sql = read_asset("flink/sql/30_build_dws_from_dwd.sql")
 
     assert "INSERT INTO kafka_ods_llm_request_events" in ingest_sql
     assert "FROM src_llm_request_events" in ingest_sql
     assert "INSERT INTO paimon_lake.dwd.llm_request_events" in dwd_sql
     assert "FROM kafka_ods_llm_request_events" in dwd_sql
-    assert "WHERE total_tokens = prompt_tokens + completion_tokens" in dwd_sql
-    assert "INSERT INTO paimon_lake.ads.llm_feature_daily_metrics" in ads_sql
-    assert "FROM paimon_lake.dwd.llm_request_events" in ads_sql
-    assert "CAST(MAX(latency_ms) AS DOUBLE) AS max_latency_ms" in ads_sql
-    assert "p95_latency_ms" not in ads_sql
-    assert "PERCENTILE_CONT(" not in ads_sql
+    assert "request_id IS NOT NULL" in dwd_sql
+    assert "created_at IS NOT NULL" in dwd_sql
+    assert "prompt_tokens >= 0" in dwd_sql
+    assert "completion_tokens >= 0" in dwd_sql
+    assert "total_tokens = prompt_tokens + completion_tokens" in dwd_sql
+    assert "latency_ms > 0" in dwd_sql
+    assert "status IN ('success', 'error')" in dwd_sql
+    assert "estimated_cost_usd >= 0" in dwd_sql
+    assert "mode IN ('mock', 'live', 'replay', 'hermes')" in dwd_sql
+    assert "INSERT INTO paimon_lake.dws.llm_feature_daily_metrics" in dws_sql
+    assert "FROM paimon_lake.dwd.llm_request_events" in dws_sql
+    assert "CAST(MAX(latency_ms) AS BIGINT) AS max_latency_ms" in dws_sql
+    assert "CAST(0 AS BIGINT) AS p95_latency_ms" in dws_sql
+    assert "PERCENTILE_CONT(" not in dws_sql
 
 
-def test_flink_verify_sql_covers_dwd_and_ads_layers():
+def test_flink_verify_sql_covers_dwd_and_dws_layers():
     dwd_sql = read_asset("flink/sql/91_verify_dwd_count.sql")
-    ads_sql = read_asset("flink/sql/92_verify_ads_metrics.sql")
+    dws_sql = read_asset("flink/sql/92_verify_dws_metrics.sql")
 
     assert "SET 'execution.runtime-mode' = 'batch'" in dwd_sql
     assert "COUNT(*) AS dwd_row_count" in dwd_sql
     assert "FROM paimon_lake.dwd.llm_request_events" in dwd_sql
-    assert "SET 'execution.runtime-mode' = 'batch'" in ads_sql
-    assert "COUNT(*) AS ads_metric_rows" in ads_sql
-    assert "SUM(request_count) AS total_request_count" in ads_sql
-    assert "FROM paimon_lake.ads.llm_feature_daily_metrics" in ads_sql
+    assert "SET 'execution.runtime-mode' = 'batch'" in dws_sql
+    assert "COUNT(*) AS dws_metric_rows" in dws_sql
+    assert "SUM(request_count) AS total_request_count" in dws_sql
+    assert "FROM paimon_lake.dws.llm_feature_daily_metrics" in dws_sql
+
+
+def test_spark_paimon_table_bootstrap_matches_flink_keyed_tables():
+    script = read_asset("scripts/spark_paimon_backfill.py")
+
+    assert "'primary-key' = 'request_id'" in script
+    assert "'primary-key' = 'date,app_name,feature_name,model_name'" in script
+    assert "'bucket' = '-1'" in script
+    assert "'bucket' = '4'" in script
+    assert "max_latency_ms BIGINT" in script
 
 
 def test_postgres_source_schema_matches_cdc_source_table():
@@ -128,6 +146,7 @@ def test_compose_defines_stream_batch_runtime_services():
     assert "user: root" in compose
     assert "paimon_warehouse:" in compose
     assert "./flink:/workspace/flink:ro" in compose
+    assert "- paimon_warehouse:/workspace/data/paimon:ro" in compose
     assert "execution.checkpointing.interval: 10s" in compose
     assert "execution.checkpointing.mode: EXACTLY_ONCE" in compose
     assert "taskmanager.numberOfTaskSlots: 4" in compose

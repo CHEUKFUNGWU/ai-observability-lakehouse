@@ -1,0 +1,5 @@
+TRUNCATE TABLE ai_observability.dws_llm_feature_daily_metrics;
+
+INSERT INTO ai_observability.dws_llm_feature_daily_metrics
+SELECT *
+FROM paimon_lake.dws.llm_feature_daily_metrics;

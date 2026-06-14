@@ -1,4 +1,4 @@
-# ADR 003: Why ADS Does Not Store Pre-Computed Rates
+# ADR 003: Why Summary Tables Do Not Store Pre-Computed Rates
 
 ## Context
 
@@ -6,10 +6,10 @@ Success rates, error rates, and span failure rates are derived metrics. Storing 
 
 ## Decision
 
-Store counts in ADS and derive rates in queries.
+Store counts in DWS and ADS tables and derive rates in queries.
 
 ## Consequences
 
-- ADS stays additive and recomputation-safe.
+- Summary tables stay additive and recomputation-safe.
 - Query logic is slightly more verbose.
 - Dashboard consumers must divide by guarded denominators at read time.

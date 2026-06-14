@@ -9,7 +9,7 @@ Implemented changes:
 - `docker-compose.yml` now provisions `doris-fe`, `doris-be`, and `doris-init` instead of ClickHouse.
 - `sql/create_doris_tables.sql` replaces the old ClickHouse DDL.
 - `sql/doris_dashboard_queries.sql` replaces the old dashboard query file.
-- `scripts/load_ads_metrics_to_doris.py` replaces the ClickHouse ADS loader.
+- `scripts/load_dws_metrics_to_doris.py` replaces the ClickHouse ADS loader.
 - `tests/test_doris_loader.py` and `tests/test_doris_schema.py` replace the ClickHouse-specific tests.
 - `config/doris/init_fe.sh` replaces the old ClickHouse loader user config.
 - `README.md` and the main design docs now describe Doris as the serving layer.
@@ -20,10 +20,12 @@ Quick verification:
 uv run pytest
 docker compose up -d doris-fe doris-be doris-init
 docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root --multiquery < sql/create_doris_tables.sql
-uv run python -m scripts.load_ads_metrics_to_doris
+uv run python -m scripts.load_dws_metrics_to_doris
 ```
 
 The rest of this document remains as the detailed migration rationale and mapping record.
+
+The current repository architecture no longer uses a parallel Spark Parquet ADS warehouse as the primary path. Flink and Spark now converge on shared Paimon DWD/DWS tables, and Doris reads those tables through local serving tables and optional Paimon catalog federation.
 
 ## 1. Why Doris
 
@@ -46,13 +48,13 @@ The reference architecture diagram uses Doris as the real-time DWD + serving lay
 
 ```text
 Real-time Path:
-PG ──► Flink CDC ──► Kafka (ODS) ──► Flink SQL ──► Paimon (DWD/ADS)
+PG ──► Flink CDC ──► Kafka (ODS) ──► Flink SQL ──► Paimon (DWD/DWS)
                                          │                  │
                                          ▼                  ▼
-                                   Doris DWD (direct)   Doris ADS (sync)
+                                   Doris DWD (direct)   Doris DWS (sync)
 
 Batch Path:
-JSONL ──► Spark ──► Parquet (ODS → DWD → ADS) ──► Doris (sync)
+JSONL ──► Spark Backfill / Validation ───────────► Paimon (DWD/DWS)
 
 Both ──► Doris ──► Dashboard / BI
 ```
@@ -76,7 +78,7 @@ Key change: Flink can write directly to Doris DWD tables via the Flink Doris Con
 
 | File | Purpose |
 |---|---|
-| `scripts/load_ads_metrics_to_doris.py` | Doris data loader via MySQL protocol |
+| `scripts/load_dws_metrics_to_doris.py` | Doris data loader via MySQL protocol |
 | `sql/create_doris_tables.sql` | Doris DDL for all DWD + ADS tables |
 | `sql/doris_dashboard_queries.sql` | Dashboard queries in Doris SQL dialect |
 | `tests/test_doris_loader.py` | Loader unit tests |
@@ -395,8 +397,8 @@ PROPERTIES (
 );
 
 -- ADS: LLM Feature Daily Metrics
-DROP TABLE IF EXISTS ai_observability.ads_llm_feature_daily_metrics;
-CREATE TABLE IF NOT EXISTS ai_observability.ads_llm_feature_daily_metrics
+DROP TABLE IF EXISTS ai_observability.dws_llm_feature_daily_metrics;
+CREATE TABLE IF NOT EXISTS ai_observability.dws_llm_feature_daily_metrics
 (
     `date`               DATE           NOT NULL,
     app_name             VARCHAR(256)   NOT NULL,
@@ -426,8 +428,8 @@ PROPERTIES (
 );
 
 -- ADS: Agent Daily Metrics
-DROP TABLE IF EXISTS ai_observability.ads_agent_daily_metrics;
-CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_daily_metrics
+DROP TABLE IF EXISTS ai_observability.dws_agent_daily_metrics;
+CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_daily_metrics
 (
     `date`               DATE           NOT NULL,
     app_name             VARCHAR(256)   NOT NULL,
@@ -464,8 +466,8 @@ PROPERTIES (
 );
 
 -- ADS: Agent Tool Daily Metrics
-DROP TABLE IF EXISTS ai_observability.ads_agent_tool_daily_metrics;
-CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_tool_daily_metrics
+DROP TABLE IF EXISTS ai_observability.dws_agent_tool_daily_metrics;
+CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_tool_daily_metrics
 (
     `date`               DATE           NOT NULL,
     agent_id             VARCHAR(128)   NOT NULL,
@@ -573,7 +575,7 @@ Replace all `llm_request_events_ch` references with `ai_observability.dwd_llm_re
 
 ### 4.2 Create Doris Loader Script
 
-**Create:** `scripts/load_ads_metrics_to_doris.py`
+**Create:** `scripts/load_dws_metrics_to_doris.py`
 
 ```python
 import argparse
@@ -588,7 +590,7 @@ from app.logging_utils import get_logger, log_info
 
 
 DEFAULT_INPUT_PATH = Path("data/warehouse/ads/llm_feature_daily_metrics.parquet")
-DEFAULT_TABLE_NAME = "ads_llm_feature_daily_metrics"
+DEFAULT_TABLE_NAME = "dws_llm_feature_daily_metrics"
 DEFAULT_DATABASE = "ai_observability"
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 9030
@@ -721,23 +723,23 @@ GRANT ALL ON ai_observability.* TO 'loader'@'%';
 
 ```python
 import pytest
-from scripts.load_ads_metrics_to_doris import qualified_table_name
+from scripts.load_dws_metrics_to_doris import qualified_table_name
 
 
 def test_qualified_table_name_accepts_safe_identifiers():
-    assert qualified_table_name("ai_observability", "ads_llm_feature_daily_metrics") == (
-        "ai_observability.ads_llm_feature_daily_metrics"
+    assert qualified_table_name("ai_observability", "dws_llm_feature_daily_metrics") == (
+        "ai_observability.dws_llm_feature_daily_metrics"
     )
 
 
 @pytest.mark.parametrize(
     ("database", "table"),
     [
-        ("ai_observability;DROP TABLE x", "ads_llm_feature_daily_metrics"),
-        ("ai_observability", "ads_llm_feature_daily_metrics;DROP TABLE x"),
-        ("ai-observability", "ads_llm_feature_daily_metrics"),
+        ("ai_observability;DROP TABLE x", "dws_llm_feature_daily_metrics"),
+        ("ai_observability", "dws_llm_feature_daily_metrics;DROP TABLE x"),
+        ("ai-observability", "dws_llm_feature_daily_metrics"),
         ("ai_observability", "ads llm feature daily metrics"),
-        ("ai_observability", "`ads_llm_feature_daily_metrics`"),
+        ("ai_observability", "`dws_llm_feature_daily_metrics`"),
     ],
 )
 def test_qualified_table_name_rejects_unsafe_identifiers(database, table):
@@ -762,9 +764,9 @@ def test_doris_schema_defines_all_dwd_and_ads_tables():
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_run_events" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_span_events" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_tool_call_events" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_llm_feature_daily_metrics" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_daily_metrics" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_agent_tool_daily_metrics" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_llm_feature_daily_metrics" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_daily_metrics" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_tool_daily_metrics" in sql
 
 
 def test_doris_tables_use_duplicate_key_model():
@@ -804,7 +806,7 @@ Parquet ODS ──► Spark ──► Parquet DWD ──► Parquet ADS ──�
                                               pymysql sync┘
 ```
 
-The streaming path writes to Paimon only. Doris reads Paimon ADS via catalog federation — no data movement needed for queries. For the batch Parquet path, the existing `load_ads_metrics_to_doris.py` script (Phase 4) syncs Parquet ADS into Doris local tables.
+The streaming path writes to Paimon only. Doris reads Paimon ADS via catalog federation — no data movement needed for queries. For the batch Parquet path, the existing `load_dws_metrics_to_doris.py` script (Phase 4) syncs Parquet ADS into Doris local tables.
 
 ### 6.2 Mount Paimon Warehouse into Doris BE
 
@@ -841,7 +843,7 @@ After running this, all Paimon databases and tables are queryable from Doris:
 SHOW DATABASES FROM paimon_lake;
 
 -- Query Paimon ADS directly (zero data movement)
-SELECT * FROM paimon_lake.ads.llm_feature_daily_metrics;
+SELECT * FROM paimon_lake.dws.llm_feature_daily_metrics;
 
 -- Query Paimon DWD for exact percentile computation
 SELECT
@@ -864,10 +866,10 @@ Catalog federation is convenient but scans Paimon files on every query. For fast
 -- Sync Paimon ADS to Doris local tables for faster dashboard queries.
 -- Run this after Flink streaming jobs have written new ADS data.
 
-TRUNCATE TABLE ai_observability.ads_llm_feature_daily_metrics;
+TRUNCATE TABLE ai_observability.dws_llm_feature_daily_metrics;
 
-INSERT INTO ai_observability.ads_llm_feature_daily_metrics
-SELECT * FROM paimon_lake.ads.llm_feature_daily_metrics;
+INSERT INTO ai_observability.dws_llm_feature_daily_metrics
+SELECT * FROM paimon_lake.dws.llm_feature_daily_metrics;
 ```
 
 This can be triggered manually, by cron, or from a script:
@@ -880,7 +882,7 @@ mysql -h 127.0.0.1 -P 9030 -u root < sql/doris_sync_paimon_ads.sql
 
 | Pattern | Source | Use Case | Performance |
 |---|---|---|---|
-| **Federation query** | `paimon_lake.ads.*` or `paimon_lake.dwd.*` | Ad-hoc analysis, exact percentiles from DWD | Slower — scans Paimon files on each query |
+| **Federation query** | `paimon_lake.dws.*` or `paimon_lake.dwd.*` | Ad-hoc analysis, exact percentiles from DWD | Slower — scans Paimon files on each query |
 | **Local table query** | `ai_observability.ads_*` | Dashboard panels, high-frequency queries | Faster — data is in Doris columnar storage |
 
 Dashboard queries should target Doris local tables for speed. Deep-dive analysis (e.g., correct p95 across feature groups) should use the Paimon DWD catalog query.
@@ -912,8 +914,8 @@ def test_doris_paimon_catalog_sql_exists():
 def test_doris_sync_paimon_ads_sql_exists():
     sql = (REPO_ROOT / "sql" / "doris_sync_paimon_ads.sql").read_text(encoding="utf-8")
 
-    assert "INSERT INTO ai_observability.ads_llm_feature_daily_metrics" in sql
-    assert "FROM paimon_lake.ads.llm_feature_daily_metrics" in sql
+    assert "INSERT INTO ai_observability.dws_llm_feature_daily_metrics" in sql
+    assert "FROM paimon_lake.dws.llm_feature_daily_metrics" in sql
 ```
 
 ---
@@ -943,7 +945,7 @@ uv run python -m scripts.load_ads_metrics_to_clickhouse
 # After (Doris)
 docker compose up -d doris-fe doris-be
 mysql -h 127.0.0.1 -P 9030 -u root < sql/create_doris_tables.sql
-uv run python -m scripts.load_ads_metrics_to_doris
+uv run python -m scripts.load_dws_metrics_to_doris
 ```
 
 ---
@@ -960,7 +962,7 @@ uv run python -m scripts.load_ads_metrics_to_doris
 | **Delete** | `sql/dashboard_queries.sql` |
 | **Create** | `sql/create_doris_tables.sql` |
 | **Create** | `sql/doris_dashboard_queries.sql` |
-| **Create** | `scripts/load_ads_metrics_to_doris.py` |
+| **Create** | `scripts/load_dws_metrics_to_doris.py` |
 | **Create** | `tests/test_doris_loader.py` |
 | **Create** | `tests/test_doris_schema.py` |
 | **Create** | `config/doris/init_fe.sh` |
@@ -1019,14 +1021,14 @@ docker compose up -d doris-fe doris-be
 mysql -h 127.0.0.1 -P 9030 -u root < sql/create_doris_tables.sql
 
 # Run batch pipeline
-uv run python -m scripts.run_local_batch_pipeline --count 100 --seed 42
+uv run python -m scripts.spark_paimon_backfill --count 100 --seed 42
 
 # Load ADS metrics to Doris
-uv run python -m scripts.load_ads_metrics_to_doris
+uv run python -m scripts.load_dws_metrics_to_doris
 
 # Verify row count
 mysql -h 127.0.0.1 -P 9030 -u root -e \
-  "SELECT COUNT(*) FROM ai_observability.ads_llm_feature_daily_metrics;"
+  "SELECT COUNT(*) FROM ai_observability.dws_llm_feature_daily_metrics;"
 
 # Run dashboard queries
 mysql -h 127.0.0.1 -P 9030 -u root < sql/doris_dashboard_queries.sql

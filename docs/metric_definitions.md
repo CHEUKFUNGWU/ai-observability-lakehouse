@@ -25,7 +25,7 @@ Percentage of requests with `status = 'success'`.
 
 ```sql
 SELECT
-    countIf(status = 'success') / count(*) AS success_rate
+    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / count(*) AS success_rate
 FROM ai_observability.dwd_llm_request_events;
 ```
 
@@ -41,7 +41,7 @@ Percentage of requests with `status = 'error'`.
 
 ```sql
 SELECT
-    countIf(status = 'error') / count(*) AS error_rate
+    SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) / count(*) AS error_rate
 FROM ai_observability.dwd_llm_request_events;
 ```
 
@@ -144,7 +144,7 @@ WHERE status = 'success';
 95th percentile request latency.
 
 This query is for the Doris DWD fact table, where percentile computation is supported directly.
-The local Flink ADS layer does not store `p95_latency_ms`; it stores `max_latency_ms` as an upper-bound proxy because the current Flink streaming SQL path uses `MAX(latency_ms)` instead of a percentile aggregate.
+The local Flink DWS layer stores `max_latency_ms` plus a placeholder `p95_latency_ms = 0` because the current Flink streaming SQL path uses `MAX(latency_ms)` instead of a percentile aggregate.
 
 ### SQL
 
@@ -187,9 +187,9 @@ Error rate grouped by model.
 ```sql
 SELECT
     model_name,
-    countIf(status = 'error') AS error_count,
+    SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_count,
     count(*) AS total_count,
-    countIf(status = 'error') / count(*) AS error_rate
+    SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) / count(*) AS error_rate
 FROM ai_observability.dwd_llm_request_events
 GROUP BY model_name
 ORDER BY error_rate DESC;
@@ -232,7 +232,7 @@ SELECT
     sum(error_count) AS failed_calls,
     sum(tool_call_count) AS total_calls,
     sum(error_count) / sum(tool_call_count) AS failure_rate
-FROM ai_observability.ads_agent_tool_daily_metrics
+FROM ai_observability.dws_agent_tool_daily_metrics
 GROUP BY tool_name
 ORDER BY failure_rate DESC;
 ```

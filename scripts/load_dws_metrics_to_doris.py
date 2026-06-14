@@ -8,8 +8,8 @@ import pymysql
 
 from app.logging_utils import get_logger, log_info
 
-DEFAULT_INPUT_PATH = Path("data/warehouse/ads/llm_feature_daily_metrics.parquet")
-DEFAULT_TABLE_NAME = "ads_llm_feature_daily_metrics"
+DEFAULT_INPUT_PATH = Path("data/warehouse/dws/llm_feature_daily_metrics.parquet")
+DEFAULT_TABLE_NAME = "dws_llm_feature_daily_metrics"
 DEFAULT_DATABASE = "ai_observability"
 DEFAULT_USER = "root"
 DEFAULT_PASSWORD = ""
@@ -28,6 +28,7 @@ LOAD_COLUMNS = [
     "total_tokens",
     "estimated_cost_usd",
     "avg_latency_ms",
+    "max_latency_ms",
     "p95_latency_ms",
 ]
 
@@ -123,7 +124,7 @@ def main() -> None:
         password=args.password,
     )
 
-    log_info(LOGGER, "doris_ads_metrics_loaded", rows=len(rows), database=args.database, table=args.table)
+    log_info(LOGGER, "doris_dws_metrics_loaded", rows=len(rows), database=args.database, table=args.table)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 ## Context
 
-Direct CDC to Paimon tightly couples ingestion with downstream storage. Restarting DWD or ADS jobs risks ingestion backpressure and limits replay.
+Direct CDC to Paimon tightly couples ingestion with downstream storage. Restarting DWD or DWS jobs risks ingestion backpressure and limits replay.
 
 ## Decision
 

@@ -8,19 +8,17 @@ graph LR
         C["Hermes Trajectories"] --> R
         D["Postgres CDC"] --> K["Kafka ODS"]
     end
-    subgraph Batch Path
-        R --> ODS_B["Parquet ODS"]
-        ODS_B --> DWD_B["Parquet DWD"]
-        DWD_B --> ADS_B["Parquet ADS"]
+    subgraph Spark Backfill
+        R --> SP["Spark Backfill / Validation"]
     end
     subgraph Stream Path
         K --> DWD_S["Paimon DWD"]
-        DWD_S --> ADS_S["Paimon ADS"]
     end
+    SP --> DWD_S
+    DWD_S --> DWS_S["Paimon DWS"]
     subgraph Serving
-        ADS_B --> CH["Doris"]
-        ADS_S --> CH
-        DWD_B --> CH
+        DWS_S --> CH["Doris"]
+        DWD_S --> CH
         CH --> DASH["Dashboard"]
     end
 ```

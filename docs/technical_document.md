@@ -7,9 +7,9 @@ The current project implements an AI application observability lakehouse for LLM
 ```text
 Mock / DeepSeek / Hermes sources
   -> Raw JSONL or Postgres source table
-  -> ODS
+  -> Kafka ODS or raw landing
   -> DWD
-  -> ADS
+  -> DWS
   -> Doris
 ```
 
@@ -18,9 +18,9 @@ There are two execution paths:
 | Path | Role |
 |---|---|
 | Spark batch | Local batch transform, backfill, testable development path |
-| Flink + Kafka + Paimon | Stream-batch lakehouse path from Postgres CDC to Kafka ODS then Paimon DWD/ADS |
+| Flink + Kafka + Paimon | Stream-batch lakehouse path from Postgres CDC to Kafka ODS then Paimon DWD/DWS |
 
-Doris is the serving layer for dashboard queries. It has ADS tables for fast aggregated views and DWD detail tables for proper percentile computation.
+Doris is the serving layer for dashboard queries. It has DWS tables for fast aggregated views and DWD detail tables for proper percentile computation.
 
 ## 2. Implemented Event Model
 
@@ -63,32 +63,30 @@ LLM path:
 
 ```text
 raw llm_request JSONL
-  -> scripts.spark_build_ods_llm_events
-  -> scripts.spark_transform_llm_events
-  -> scripts.spark_build_ads_llm_feature_daily_metrics
+  -> scripts.spark_paimon_backfill
+  -> paimon_lake.dwd.llm_request_events
+  -> paimon_lake.dws.llm_feature_daily_metrics
 ```
 
 Agent path:
 
 ```text
-raw agent_run / agent_span JSONL
-  -> scripts.spark_build_ods_agent_events
+source-adapted agent_run / agent_span events
   -> scripts.spark_transform_agent_events
-  -> scripts.spark_build_ads_agent_daily_metrics
+  -> scripts.spark_build_dws_agent_daily_metrics
 
-raw agent_tool_call JSONL
-  -> scripts.spark_build_ods_agent_tool_calls
+source-adapted agent_tool_call events
   -> scripts.spark_transform_agent_tool_calls
-  -> scripts.spark_build_ads_agent_tool_daily_metrics
+  -> scripts.spark_build_dws_agent_tool_daily_metrics
 ```
 
 Local orchestration:
 
 ```text
-scripts/run_local_batch_pipeline.py
+scripts/spark_paimon_backfill.py
 ```
 
-The local batch pipeline uses one shared SparkSession for ODS, DWD and ADS work.
+The Spark backfill path writes to the same Paimon catalog that Flink uses, so it supplements the streaming warehouse instead of creating a second one.
 
 ## 5. Flink + Paimon Path
 
@@ -99,7 +97,7 @@ Postgres source table
   -> Flink CDC source
   -> Kafka ODS table
   -> Paimon DWD table
-  -> Paimon ADS table
+  -> Paimon DWS table
 ```
 
 Implemented Flink SQL files:
@@ -110,10 +108,10 @@ Implemented Flink SQL files:
 | `01_source_postgres_cdc.sql` | Define Postgres CDC source |
 | `02_ods_kafka_tables.sql` | Define Kafka ODS table |
 | `03_dwd_paimon_tables.sql` | Define DWD Paimon table |
-| `04_ads_paimon_tables.sql` | Define ADS Paimon table |
+| `04_dws_paimon_tables.sql` | Define DWS Paimon table |
 | `10_ingest_ods_to_kafka.sql` | Insert source changes into Kafka ODS |
 | `20_build_dwd_from_kafka_ods.sql` | Validate and transform Kafka ODS to DWD |
-| `30_build_ads_from_dwd.sql` | Aggregate DWD to ADS |
+| `30_build_dws_from_dwd.sql` | Aggregate DWD to DWS |
 
 All systems use `date` as the partition/date field. In Flink SQL it is escaped as `` `date` `` because `DATE` is also a type keyword.
 
@@ -132,7 +130,7 @@ DWD:
 - Drops raw `prompt_text` and `response_text` from LLM DWD to avoid large/sensitive text in analytical facts.
 - Sends invalid rows to quarantine instead of failing the whole batch.
 
-ADS:
+DWS:
 
 - Stores additive or directly aggregated metrics.
 - Does not store redundant `success_rate` or `error_rate`.
@@ -153,11 +151,11 @@ Implemented Doris DWD tables:
 - `dwd_agent_span_events`
 - `dwd_agent_tool_call_events`
 
-Implemented Doris ADS tables:
+Implemented Doris DWS tables:
 
-- `ads_llm_feature_daily_metrics`
-- `ads_agent_daily_metrics`
-- `ads_agent_tool_daily_metrics`
+- `dws_llm_feature_daily_metrics`
+- `dws_agent_daily_metrics`
+- `dws_agent_tool_daily_metrics`
 - `ads_cost_anomaly_daily`
 - `ads_sla_daily_report`
 - `ads_prompt_version_daily_metrics`
@@ -166,32 +164,32 @@ Implemented Doris ADS tables:
 Loader:
 
 ```text
-scripts/load_ads_metrics_to_doris.py
+scripts/load_dws_metrics_to_doris.py
 ```
 
 The loader validates database and table identifiers before building `TRUNCATE TABLE` and `INSERT` targets.
 
 ## 8. Metric Notes
 
-LLM ADS grain:
+LLM DWS grain:
 
 ```text
 date, app_name, feature_name, model_name
 ```
 
-Agent ADS grain:
+Agent DWS grain:
 
 ```text
 date, app_name, agent_id, agent_name, task_type
 ```
 
-Agent tool ADS grain:
+Agent tool DWS grain:
 
 ```text
 date, agent_id, tool_name, tool_type
 ```
 
-For Spark ADS, p95 metrics use `percentile_approx`. For the local Flink ADS MVP, `max_latency_ms` stores an explicit upper-bound metric because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate in this setup. Doris DWD tables are available for proper serving-layer percentile queries.
+For Spark DWS, p95 metrics use `percentile_approx`. For the local Flink DWS MVP, `max_latency_ms` stores an explicit upper-bound metric and `p95_latency_ms` is written as `0` because Flink 1.20 SQL does not support `PERCENTILE_CONT` as a streaming aggregate in this setup. Doris DWD tables are available for proper serving-layer percentile queries.
 
 ## 9. Local Verification
 
@@ -201,10 +199,10 @@ Run all tests:
 uv run pytest
 ```
 
-Run the local batch demo:
+Run the Spark backfill demo:
 
 ```bash
-uv run python -m scripts.run_local_batch_pipeline --count 100 --seed 42
+uv run python -m scripts.spark_paimon_backfill --count 100 --seed 42
 ```
 
 Start Doris and create serving tables:
@@ -222,9 +220,10 @@ scripts/run_flink_sql_sequence.sh \
   flink/sql/01_source_postgres_cdc.sql \
   flink/sql/02_ods_kafka_tables.sql \
   flink/sql/03_dwd_paimon_tables.sql \
-  flink/sql/04_ads_paimon_tables.sql \
+  flink/sql/04_dws_paimon_tables.sql \
   flink/sql/10_ingest_ods_to_kafka.sql \
-  flink/sql/20_build_dwd_from_kafka_ods.sql
+  flink/sql/20_build_dwd_from_kafka_ods.sql \
+  flink/sql/30_build_dws_from_dwd.sql
 ```
 
 ## 10. Planned Extensions

@@ -45,4 +45,12 @@ SELECT
     created_at,
     `date`
 FROM kafka_ods_llm_request_events
-WHERE total_tokens = prompt_tokens + completion_tokens;
+WHERE request_id IS NOT NULL
+  AND created_at IS NOT NULL
+  AND prompt_tokens >= 0
+  AND completion_tokens >= 0
+  AND total_tokens = prompt_tokens + completion_tokens
+  AND latency_ms > 0
+  AND status IN ('success', 'error')
+  AND estimated_cost_usd >= 0
+  AND mode IN ('mock', 'live', 'replay', 'hermes');

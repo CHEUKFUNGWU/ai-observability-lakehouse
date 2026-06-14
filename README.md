@@ -6,7 +6,7 @@ A stream-batch analytics lakehouse for monitoring LLM applications and Agent run
 
 Modern AI applications generate large volumes of operational events, including LLM requests, token usage, latency, errors, agent runs, agent spans and tool calls. These logs are valuable for cost control, performance monitoring and product analytics, but they are often scattered across application logs and difficult to analyze.
 
-This project builds an end-to-end data platform that collects both simulated AI application events and real DeepSeek API call logs, transforms them into warehouse layers, supports streaming CDC ingestion through Postgres CDC -> Kafka -> Flink/Paimon, keeps Spark for batch backfills, queries ADS metrics with Doris and prepares dashboard-ready metrics.
+This project builds an end-to-end data platform that collects both simulated AI application events and real DeepSeek API call logs, transforms them into warehouse layers, supports streaming CDC ingestion through Postgres CDC -> Kafka -> Flink/Paimon, keeps Spark for batch backfills, queries DWS metrics with Doris and prepares dashboard-ready metrics.
 
 ## 2. Business Value
 
@@ -27,7 +27,7 @@ The project helps answer practical AI application observability questions:
 - Python: event generation and DeepSeek API call collection
 - DeepSeek API: real LLM workload collection
 - Flink CDC: operational source-table change capture
-- Flink SQL: streaming ODS, DWD and ADS transformations
+- Flink SQL: streaming Kafka ODS, DWD and DWS transformations
 - Apache Paimon: stream-batch lakehouse table storage
 - Apache Spark: batch backfill, historical recomputation and validation
 - Doris: low-latency OLAP queries
@@ -35,7 +35,7 @@ The project helps answer practical AI application observability questions:
 
 ## 4. Architecture
 
-### MVP Batch Architecture
+### Shared-Warehouse Architecture
 
 ```text
 DeepSeek API / Mock Log Generator
@@ -44,13 +44,17 @@ DeepSeek API / Mock Log Generator
 Raw JSONL Events
         |
         v
-ODS Source Event Tables
+Postgres CDC / Raw JSONL
         |
-        v
-Apache Spark Batch Job
-        |
-        v
-DWD / ADS Warehouse Tables
+        +----------------------------+
+        |                            |
+        v                            v
+Kafka ODS via Flink CDC       Spark Backfill / Validation
+        |                            |
+        +------------+---------------+
+                     |
+                     v
+             Paimon DWD / DWS Tables
         |
         v
 Doris Query Layer
@@ -74,7 +78,7 @@ Kafka ODS
 Flink SQL
         |
         v
-Paimon ODS / DWD / ADS Tables
+Paimon DWD / DWS Tables
         |
         +---------------------+
         |                     |
@@ -138,7 +142,7 @@ Generate 1M / 10M mock events
 Operational source tables
 → Flink CDC
 → Flink SQL
-→ Paimon ODS / DWD / ADS
+→ Paimon DWD / DWS
 → Spark batch backfill and validation
 → Doris
 ```
@@ -152,7 +156,7 @@ postgres.public.llm_request_events
 → Flink CDC source table
 → kafka_ods_llm_request_events
 → paimon_lake.dwd.llm_request_events
-→ paimon_lake.ads.llm_feature_daily_metrics
+→ paimon_lake.dws.llm_feature_daily_metrics
 ```
 
 Flink SQL assets are stored in:
@@ -168,10 +172,10 @@ Execution order:
 01_source_postgres_cdc.sql
 02_ods_kafka_tables.sql
 03_dwd_paimon_tables.sql
-04_ads_paimon_tables.sql
+04_dws_paimon_tables.sql
 10_ingest_ods_to_kafka.sql
 20_build_dwd_from_kafka_ods.sql
-30_build_ads_from_dwd.sql
+30_build_dws_from_dwd.sql
 ```
 
 The local Postgres source schema is stored in:
@@ -204,7 +208,7 @@ Run a Flink SQL asset:
 scripts/run_flink_sql_file.sh flink/sql/00_catalogs.sql
 ```
 
-The SQL runner uses a dedicated `flink-sql-client` container, following the Apache Flink session cluster pattern: JobManager and TaskManager stay as the runtime cluster, while SQL Client submits statements to that cluster. Kafka is the real-time ODS buffer, while Paimon stores validated DWD and ADS tables.
+The SQL runner uses a dedicated `flink-sql-client` container, following the Apache Flink session cluster pattern: JobManager and TaskManager stay as the runtime cluster, while SQL Client submits statements to that cluster. Kafka is the real-time ODS buffer, while Paimon stores validated DWD and DWS tables.
 
 The Flink Web UI is available at:
 
@@ -212,48 +216,52 @@ The Flink Web UI is available at:
 http://localhost:8081
 ```
 
-## 9. Local Batch Pipeline
+## 9. Spark Backfill and Validation
 
-The current local MVP pipeline supports the LLM request path:
+Spark is no longer a parallel warehouse pipeline. Its role is to backfill and validate the shared Paimon warehouse that Flink also writes to.
+
+LLM backfill path:
 
 ```text
 mock JSONL events
-→ ODS llm_request source events as partitioned Parquet
-→ DWD llm_request events as partitioned Parquet
-→ ADS llm_feature_daily_metrics as partitioned Parquet
+→ transform + validate in Spark
+→ paimon_lake.dwd.llm_request_events
+→ paimon_lake.dws.llm_feature_daily_metrics
+→ quarantine Parquet for rejected rows
 ```
 
-Run the full local batch pipeline:
+Run the backfill:
 
 ```bash
-uv run python -m scripts.run_local_batch_pipeline --count 100 --seed 42
+uv run python -m scripts.spark_paimon_backfill --count 100 --seed 42
 ```
 
-Default outputs:
+Validate the shared Paimon DWD table:
+
+```bash
+uv run python -m scripts.spark_paimon_validate
+```
+
+Default local outputs:
 
 ```text
 data/raw/mock_llm_requests/events.jsonl
-data/warehouse/ods/llm_request/events.parquet
-data/warehouse/llm_request/events.parquet
-data/warehouse/ads/llm_feature_daily_metrics.parquet
+data/warehouse/quarantine/llm_request/events.parquet
+data/paimon/
 ```
 
-The Agent runtime path uses a more general model than Dify-specific `workflow_run` or `node_execution` tables:
+The Agent runtime path still uses Spark-based transforms and DWS builders for its reusable summary tables:
+
+The repository now keeps the Agent runtime Spark modules as transform/build steps rather than a standalone raw JSONL to ODS pipeline. The expected flow is:
 
 ```text
-mock agent run/span JSONL events
-→ ODS agent_run and agent_span source events as partitioned Parquet
-→ DWD agent_run and agent_span events as partitioned Parquet
-→ ADS agent_daily_metrics as partitioned Parquet
-```
+source-adapted agent_run / agent_span events
+→ scripts.spark_transform_agent_events
+→ scripts.spark_build_dws_agent_daily_metrics
 
-Run the Agent runtime pipeline step by step:
-
-```bash
-uv run python -m scripts.generate_mock_agent_logs --count 10 --seed 42
-uv run python -m scripts.spark_build_ods_agent_events
-uv run python -m scripts.spark_transform_agent_events
-uv run python -m scripts.spark_build_ads_agent_daily_metrics
+source-adapted agent_tool_call events
+→ scripts.spark_transform_agent_tool_calls
+→ scripts.spark_build_dws_agent_tool_daily_metrics
 ```
 
 Default Agent outputs:
@@ -265,15 +273,15 @@ data/warehouse/ods/agent_run/events.parquet
 data/warehouse/ods/agent_span/events.parquet
 data/warehouse/agent_run/events.parquet
 data/warehouse/agent_span/events.parquet
-data/warehouse/ads/agent_daily_metrics.parquet
+data/warehouse/dws/agent_daily_metrics.parquet
 ```
 
-Hermes Agent trajectories can be used as a real Agent source:
+Hermes Agent trajectories can still be used as a real Agent source:
 
 ```text
 Hermes trajectories.jsonl
 → parsed agent_run / agent_span / agent_tool_call raw events
-→ ODS source event tables
+→ source-adapted event parquet
 → DWD agent_run / agent_span / agent_tool_call events
 ```
 
@@ -284,21 +292,9 @@ uv run python -m scripts.parse_hermes_trajectories \
   --input data/raw/hermes_trajectories/trajectories.jsonl
 ```
 
-Build Hermes ODS and DWD tables:
+Build Hermes DWD tables from prepared event parquet:
 
 ```bash
-uv run python -m scripts.spark_build_ods_agent_events \
-  --run-input data/raw/hermes_agent_runs/events.jsonl \
-  --span-input data/raw/hermes_agent_spans/events.jsonl \
-  --run-output data/warehouse/ods/hermes_agent_run/events.parquet \
-  --span-output data/warehouse/ods/hermes_agent_span/events.parquet \
-  --source-name hermes_trajectory
-
-uv run python -m scripts.spark_build_ods_agent_tool_calls \
-  --input data/raw/hermes_agent_tool_calls/events.jsonl \
-  --output data/warehouse/ods/hermes_agent_tool_call/events.parquet \
-  --source-name hermes_trajectory
-
 uv run python -m scripts.spark_transform_agent_events \
   --run-input data/warehouse/ods/hermes_agent_run/events.parquet \
   --span-input data/warehouse/ods/hermes_agent_span/events.parquet \
@@ -310,12 +306,12 @@ uv run python -m scripts.spark_transform_agent_tool_calls \
   --output data/warehouse/hermes_agent_tool_call/events.parquet
 ```
 
-Build Hermes tool-call ADS metrics:
+Build Hermes tool-call DWS metrics:
 
 ```bash
-uv run python -m scripts.spark_build_ads_agent_tool_daily_metrics \
+uv run python -m scripts.spark_build_dws_agent_tool_daily_metrics \
   --input data/warehouse/hermes_agent_tool_call/events.parquet \
-  --output data/warehouse/ads/hermes_agent_tool_daily_metrics.parquet
+  --output data/warehouse/dws/hermes_agent_tool_daily_metrics.parquet
 ```
 
 Run tests:
@@ -326,7 +322,7 @@ uv run pytest
 
 ## 10. Doris Query Layer
 
-The MVP query layer loads ADS metrics into local Doris `DUPLICATE KEY` tables for dashboard-style analytics.
+Doris serves dashboard-style analytics from local serving tables and can also federate directly to the shared Paimon warehouse.
 
 Start Doris:
 
@@ -334,23 +330,24 @@ Start Doris:
 docker compose up -d doris-fe doris-be doris-init
 ```
 
-Create the Doris database and ADS table:
+Create the Doris database and serving tables:
 
 ```bash
 docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root --multiquery < sql/create_doris_tables.sql
 ```
 
-Load ADS Parquet metrics into Doris:
+Create the Paimon catalog and sync DWS metrics from Paimon:
 
 ```bash
-uv run python -m scripts.load_ads_metrics_to_doris
+docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root < sql/doris_create_paimon_catalog.sql
+docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root < sql/doris_sync_paimon_dws.sql
 ```
 
 Check the loaded row count:
 
 ```bash
 docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root \
-  --query "SELECT count() FROM ai_observability.ads_llm_feature_daily_metrics"
+  --query "SELECT count(*) FROM ai_observability.dws_llm_feature_daily_metrics"
 ```
 
 Dashboard SQL examples are stored in:
@@ -374,128 +371,14 @@ The current dashboard query set covers:
 
 ```text
 ai-observability-lakehouse/
-├── .env.example
-├── .gitignore
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── Makefile
-├── README.md
-├── docker-compose.yml
-├── flink/
-│   ├── README.md
-│   └── sql/
-│       ├── 00_catalogs.sql
-│       ├── 01_source_postgres_cdc.sql
-│       ├── 02_ods_kafka_tables.sql
-│       ├── 03_dwd_paimon_tables.sql
-│       ├── 04_ads_paimon_tables.sql
-│       ├── 10_ingest_ods_to_kafka.sql
-│       ├── 20_build_dwd_from_kafka_ods.sql
-│       ├── 30_build_ads_from_dwd.sql
-│       ├── 91_verify_dwd_count.sql
-│       └── 92_verify_ads_metrics.sql
-├── pyproject.toml
-├── uv.lock
-├── app/
-│   ├── __init__.py
-│   ├── agent_event.py
-│   ├── data_quality.py
-│   ├── deepseek_client.py
-│   ├── dim_model.py
-│   ├── logging_utils.py
-│   ├── llm_event.py
-│   ├── model_pricing.py
-│   └── pipeline_metadata.py
-├── data/
-│   ├── raw/
-│   │   ├── mock_llm_requests/
-│   │   ├── live_llm_requests/
-│   │   ├── mock_agent_runs/
-│   │   └── mock_agent_spans/
-│   └── warehouse/
-│       ├── ods/
-│       ├── llm_request/
-│       ├── quarantine/
-│       ├── live_llm_request/
-│       ├── agent_run/
-│       ├── agent_span/
-│       └── ads/
-├── config/
-│   ├── sla_rules.yaml
-│   └── doris/
-│       └── init_fe.sh
-├── scripts/
-│   ├── create_kafka_topics.sh
-│   ├── export_llm_jsonl_to_postgres_copy.py
-│   ├── generate_mock_agent_logs.py
-│   ├── generate_mock_llm_logs.py
-│   ├── load_ads_metrics_to_doris.py
-│   ├── load_llm_jsonl_to_postgres_source.sh
-│   ├── parse_hermes_trajectories.py
-│   ├── prepare_flink_warehouse.sh
-│   ├── run_benchmark.py
-│   ├── run_deepseek_live_calls.py
-│   ├── run_flink_sql_file.sh
-│   ├── run_flink_sql_sequence.sh
-│   ├── run_full_demo.sh
-│   ├── run_local_batch_pipeline.py
-│   ├── spark_build_ads_agent_daily_metrics.py
-│   ├── spark_build_ads_agent_tool_daily_metrics.py
-│   ├── spark_build_ads_cost_anomaly.py
-│   ├── spark_build_ads_llm_feature_daily_metrics.py
-│   ├── spark_build_ads_prompt_version_metrics.py
-│   ├── spark_build_ads_sla_daily.py
-│   ├── spark_build_dim_model.py
-│   ├── spark_build_ods_agent_events.py
-│   ├── spark_build_ods_agent_tool_calls.py
-│   ├── spark_build_ods_llm_events.py
-│   ├── spark_transform_agent_events.py
-│   ├── spark_transform_agent_tool_calls.py
-│   ├── spark_transform_llm_events.py
-│   ├── spark_utils.py
-│   └── test_flink_failover.sh
-├── sql/
-│   ├── create_doris_tables.sql
-│   ├── doris_dashboard_queries.sql
-│   └── source_postgres_schema.sql
-├── docs/
-│   ├── adr/
-│   │   ├── 001-paimon-over-iceberg.md
-│   │   ├── 002-kafka-as-realtime-ods.md
-│   │   ├── 003-no-stored-rates-in-ads.md
-│   │   ├── 004-flink-ads-p95-max-proxy.md
-│   │   └── 005-generic-agent-model.md
-│   ├── benchmark_results.md
-│   ├── data_lineage.md
-│   ├── failover_test_report.md
-│   ├── stream_batch_platform.md
-│   ├── upgrade_plan.md
-│   ├── product_document.md
-│   ├── technical_document.md
-│   ├── data_model.md
-│   └── metric_definitions.md
-└── tests/
-    ├── conftest.py
-    ├── test_ads_agent_daily_metrics.py
-    ├── test_ads_agent_tool_daily_metrics.py
-    ├── test_ads_feature_daily_metrics.py
-    ├── test_doris_loader.py
-    ├── test_doris_schema.py
-    ├── test_data_quality.py
-    ├── test_deepseek_client.py
-    ├── test_deepseek_live_calls.py
-    ├── test_dim_and_analytics_assets.py
-    ├── test_flink_sql_assets.py
-    ├── test_local_batch_pipeline.py
-    ├── test_mock_agent_log_generation.py
-    ├── test_mock_log_generation.py
-    ├── test_ods_events.py
-    ├── test_parse_hermes_trajectories.py
-    ├── test_postgres_source_export.py
-    ├── test_spark_transform_agent_events.py
-    ├── test_spark_transform_agent_tool_calls.py
-    └── test_spark_transform_llm_events.py
+├── app/                         # shared domain models, pricing, DQ, metadata
+├── config/                      # SLA rules and Doris bootstrap
+├── docker/                      # Flink image build
+├── docs/                        # ADRs, architecture, lineage, metrics, migration notes
+├── flink/sql/                   # CDC, Kafka ODS, DWD, DWS, verification SQL
+├── scripts/                     # generators, Spark backfill/validation, loaders, demos
+├── sql/                         # Postgres schema, Doris DDL, catalog/sync SQL, dashboards
+└── tests/                       # unit tests plus optional Paimon integration test
 ```
 
 ## 12. Live DeepSeek API Mode
@@ -539,33 +422,13 @@ Each event includes:
 - error_type
 - estimated_cost_usd
 
-Failed API calls are captured as standard observability events with `status="error"`, `error_type`, `http_status`, zero token counts and zero estimated cost. This lets downstream DWD and ADS jobs calculate error rates without special handling.
+Failed API calls are captured as standard observability events with `status="error"`, `error_type`, `http_status`, zero token counts and zero estimated cost. This lets downstream DWD and DWS jobs calculate error rates without special handling.
 
-### Build Live ODS, DWD and ADS Tables
-
-Build the live ODS table:
+### Backfill Live Events into Paimon
 
 ```bash
-uv run python -m scripts.spark_build_ods_llm_events \
-  --input data/raw/live_llm_requests/deepseek_events.jsonl \
-  --output data/warehouse/ods/live_llm_request/events.parquet \
-  --source-name deepseek_live_collector
-```
-
-Build the live DWD table from ODS:
-
-```bash
-uv run python -m scripts.spark_transform_llm_events \
-  --input data/warehouse/ods/live_llm_request/events.parquet \
-  --output data/warehouse/live_llm_request/events.parquet
-```
-
-Build the live ADS feature daily metrics table:
-
-```bash
-uv run python -m scripts.spark_build_ads_llm_feature_daily_metrics \
-  --input data/warehouse/live_llm_request/events.parquet \
-  --output data/warehouse/ads/live_llm_feature_daily_metrics.parquet
+uv run python -m scripts.spark_paimon_backfill \
+  --input data/raw/live_llm_requests/deepseek_events.jsonl
 ```
 
 ## 13. Why This Project Matters
