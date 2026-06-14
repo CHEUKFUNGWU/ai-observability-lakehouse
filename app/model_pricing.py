@@ -12,13 +12,17 @@ MODEL_PRICING_USD: dict[str, ModelPricing] = {
         input_price_per_1m_tokens=0.14,
         output_price_per_1m_tokens=0.28,
     ),
+    "deepseek-reasoner": ModelPricing(
+        input_price_per_1m_tokens=0.14,
+        output_price_per_1m_tokens=0.28,
+    ),
     "deepseek-v4-flash": ModelPricing(
         input_price_per_1m_tokens=0.14,
         output_price_per_1m_tokens=0.28,
     ),
     "deepseek-v4-pro": ModelPricing(
-        input_price_per_1m_tokens=0.14,
-        output_price_per_1m_tokens=0.28,
+        input_price_per_1m_tokens=0.435,
+        output_price_per_1m_tokens=0.87,
     ),
 }
 
