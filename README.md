@@ -186,7 +186,25 @@ sql/source_postgres_schema.sql
 
 Spark remains part of the platform as the batch engine for historical recomputation and validation.
 
-Build and start the local Flink runtime:
+The detailed local operations guide is in:
+
+```text
+docs/runtime_runbook.md
+```
+
+For most development, start only the light streaming runtime:
+
+```bash
+make infra-light
+```
+
+Start Doris only when validating the serving/query layer:
+
+```bash
+make infra-serving
+```
+
+Build and start the local Flink runtime manually:
 
 ```bash
 docker compose build flink-jobmanager
@@ -209,6 +227,18 @@ scripts/run_flink_sql_file.sh flink/sql/00_catalogs.sql
 ```
 
 The SQL runner uses a dedicated `flink-sql-client` container, following the Apache Flink session cluster pattern: JobManager and TaskManager stay as the runtime cluster, while SQL Client submits statements to that cluster. Kafka is the real-time ODS buffer, while Paimon stores validated DWD and DWS tables.
+
+Submit all streaming SQL jobs:
+
+```bash
+make flink-submit
+```
+
+Check local pipeline health:
+
+```bash
+make health
+```
 
 The Flink Web UI is available at:
 

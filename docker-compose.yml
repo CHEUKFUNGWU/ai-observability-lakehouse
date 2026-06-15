@@ -35,8 +35,12 @@ services:
         jobmanager.rpc.address: flink-jobmanager
         rest.address: 0.0.0.0
         parallelism.default: 1
+        restart-strategy.type: fixed-delay
+        restart-strategy.fixed-delay.attempts: 3
+        restart-strategy.fixed-delay.delay: 10s
         execution.checkpointing.interval: 10s
         execution.checkpointing.mode: EXACTLY_ONCE
+        execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
         state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints
         state.savepoints.dir: file:///workspace/data/paimon/_savepoints
         classloader.parent-first-patterns.additional: org.apache.commons.collections;io.debezium
@@ -57,8 +61,12 @@ services:
         jobmanager.rpc.address: flink-jobmanager
         taskmanager.numberOfTaskSlots: 4
         parallelism.default: 1
+        restart-strategy.type: fixed-delay
+        restart-strategy.fixed-delay.attempts: 3
+        restart-strategy.fixed-delay.delay: 10s
         execution.checkpointing.interval: 10s
         execution.checkpointing.mode: EXACTLY_ONCE
+        execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
         state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints
         state.savepoints.dir: file:///workspace/data/paimon/_savepoints
         classloader.parent-first-patterns.additional: org.apache.commons.collections;io.debezium
@@ -77,8 +85,12 @@ services:
         jobmanager.rpc.address: flink-jobmanager
         rest.address: flink-jobmanager
         parallelism.default: 1
+        restart-strategy.type: fixed-delay
+        restart-strategy.fixed-delay.attempts: 3
+        restart-strategy.fixed-delay.delay: 10s
         execution.checkpointing.interval: 10s
         execution.checkpointing.mode: EXACTLY_ONCE
+        execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION
         state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints
         state.savepoints.dir: file:///workspace/data/paimon/_savepoints
         classloader.parent-first-patterns.additional: org.apache.commons.collections;io.debezium

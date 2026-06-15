@@ -42,14 +42,15 @@ CREATE TABLE IF NOT EXISTS kafka_ods_llm_request_events (
     region STRING,
     environment STRING,
     created_at TIMESTAMP(3),
-    `date` DATE
+    `date` DATE,
+    PRIMARY KEY (request_id) NOT ENFORCED
 ) WITH (
-    'connector' = 'kafka',
+    'connector' = 'upsert-kafka',
     'topic' = 'ods_llm_request_events',
     'properties.bootstrap.servers' = 'kafka:9092',
     'properties.group.id' = 'flink-ods-llm-request-events',
-    'scan.startup.mode' = 'earliest-offset',
-    'format' = 'json',
-    'json.fail-on-missing-field' = 'false',
-    'json.ignore-parse-errors' = 'true'
+    'key.format' = 'json',
+    'value.format' = 'json',
+    'value.json.fail-on-missing-field' = 'false',
+    'value.json.ignore-parse-errors' = 'true'
 );

@@ -56,7 +56,8 @@ def test_paimon_layers_use_expected_tables():
     dws_sql = read_asset("flink/sql/04_dws_paimon_tables.sql")
 
     assert "kafka_ods_llm_request_events" in ods_sql
-    assert "'connector' = 'kafka'" in ods_sql
+    assert "'connector' = 'upsert-kafka'" in ods_sql
+    assert "PRIMARY KEY (request_id) NOT ENFORCED" in ods_sql
     assert "paimon_lake.dwd.llm_request_events" in dwd_sql
     assert "paimon_lake.dws.llm_feature_daily_metrics" in dws_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in dwd_sql
@@ -149,6 +150,9 @@ def test_compose_defines_stream_batch_runtime_services():
     assert "- paimon_warehouse:/workspace/data/paimon:ro" in compose
     assert "execution.checkpointing.interval: 10s" in compose
     assert "execution.checkpointing.mode: EXACTLY_ONCE" in compose
+    assert "execution.checkpointing.externalized-checkpoint-retention: RETAIN_ON_CANCELLATION" in compose
+    assert "restart-strategy.type: fixed-delay" in compose
+    assert "restart-strategy.fixed-delay.attempts: 3" in compose
     assert "taskmanager.numberOfTaskSlots: 4" in compose
     assert "state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints" in compose
     assert "state.savepoints.dir: file:///workspace/data/paimon/_savepoints" in compose
@@ -176,6 +180,37 @@ def test_flink_sql_sequence_runner_keeps_catalog_in_one_session():
     assert "docker compose run -T --rm flink-sql-client" in script
     assert "/opt/flink/bin/sql-client.sh" in script
     assert "-f \"/workspace/${tmp_file}\"" in script
+
+
+def test_flink_savepoint_restore_helpers_are_available():
+    savepoint_script = read_asset("scripts/flink_savepoint.sh")
+    cancel_script = read_asset("scripts/flink_cancel_job.sh")
+    restore_script = read_asset("scripts/run_flink_sql_from_savepoint.sh")
+
+    assert "/opt/flink/bin/flink savepoint" in savepoint_script
+    assert "file:///workspace/data/paimon/_savepoints" in savepoint_script
+    assert "/opt/flink/bin/flink cancel" in cancel_script
+    assert "SET 'execution.savepoint.path'" in restore_script
+    assert "docker compose run -T --rm flink-sql-client" in restore_script
+
+
+def test_light_and_serving_demo_commands_are_split():
+    makefile = read_asset("Makefile")
+    streaming_demo = read_asset("scripts/run_streaming_demo.sh")
+    serving_demo = read_asset("scripts/run_serving_demo.sh")
+    health_script = read_asset("scripts/check_pipeline_health.sh")
+
+    assert "infra-light:" in makefile
+    assert "infra-serving:" in makefile
+    assert "demo-streaming:" in makefile
+    assert "demo-serving:" in makefile
+    assert "scripts/run_streaming_demo.sh" in read_asset("scripts/run_full_demo.sh")
+    assert "doris-fe" not in streaming_demo
+    assert "make" not in streaming_demo
+    assert "docker compose up -d doris-fe doris-be doris-init" in serving_demo
+    assert "ods_llm_request_events" in health_script
+    assert "insert-into_paimon_lake.dwd.llm_request_events" in health_script
+    assert "insert-into_paimon_lake.dws.llm_feature_daily_metrics" in health_script
 
 
 def test_flink_warehouse_prepare_script_creates_checkpoint_dirs():
