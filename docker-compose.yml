@@ -39,6 +39,7 @@ services:
         execution.checkpointing.mode: EXACTLY_ONCE
         state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints
         state.savepoints.dir: file:///workspace/data/paimon/_savepoints
+        classloader.parent-first-patterns.additional: org.apache.commons.collections;io.debezium
     volumes:
       - ./flink:/workspace/flink:ro
       - paimon_warehouse:/workspace/data/paimon
@@ -60,6 +61,7 @@ services:
         execution.checkpointing.mode: EXACTLY_ONCE
         state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints
         state.savepoints.dir: file:///workspace/data/paimon/_savepoints
+        classloader.parent-first-patterns.additional: org.apache.commons.collections;io.debezium
     volumes:
       - ./flink:/workspace/flink:ro
       - paimon_warehouse:/workspace/data/paimon
@@ -79,6 +81,7 @@ services:
         execution.checkpointing.mode: EXACTLY_ONCE
         state.checkpoints.dir: file:///workspace/data/paimon/_checkpoints
         state.savepoints.dir: file:///workspace/data/paimon/_savepoints
+        classloader.parent-first-patterns.additional: org.apache.commons.collections;io.debezium
     volumes:
       - ./flink:/workspace/flink:ro
       - paimon_warehouse:/workspace/data/paimon
@@ -93,8 +96,10 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -106,26 +111,23 @@ services:
       - kafka_data:/var/lib/kafka/data
 
   doris-fe:
-    image: apache/doris:2.1.7_fe-x86_64
+    image: apache/doris:fe-2.1.11
     container_name: ai-observability-doris-fe
+    entrypoint: ["/opt/apache-doris/fe/bin/start_fe.sh", "--console"]
     ports:
       - "8030:8030"
       - "9030:9030"
-    environment:
-      FE_SERVERS: "fe1:doris-fe:9010"
-      FE_ID: "1"
     volumes:
       - doris_fe_data:/opt/apache-doris/fe/doris-meta
+      - paimon_warehouse:/workspace/data/paimon:ro
 
   doris-be:
-    image: apache/doris:2.1.7_be-x86_64
+    image: apache/doris:be-2.1.11
     container_name: ai-observability-doris-be
+    entrypoint: ["bash", "-c", "export SKIP_CHECK_ULIMIT=true && /opt/apache-doris/be/bin/start_be.sh --console"]
     ports:
       - "8040:8040"
       - "9050:9050"
-    environment:
-      FE_SERVERS: "fe1:doris-fe:9010"
-      BE_ADDR: "doris-be:9050"
     volumes:
       - doris_be_data:/opt/apache-doris/be/storage
       - paimon_warehouse:/workspace/data/paimon:ro

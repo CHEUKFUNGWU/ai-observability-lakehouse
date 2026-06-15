@@ -264,7 +264,7 @@ CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_daily_metrics
     tool_span_count BIGINT NOT NULL,
     llm_span_count BIGINT NOT NULL
 )
-DUPLICATE KEY(`date`, app_name, agent_id, task_type)
+DUPLICATE KEY(`date`, app_name, agent_id, agent_name, task_type)
 PARTITION BY RANGE(`date`) ()
 DISTRIBUTED BY HASH(agent_id) BUCKETS 4
 PROPERTIES (
