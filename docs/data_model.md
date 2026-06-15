@@ -21,9 +21,9 @@ Data sources / collectors
   -> Raw JSONL files
   -> Kafka ODS or raw landing
   -> DWD typed business event tables
-  -> DWS llm_feature_daily_metrics
-  -> DWS agent_daily_metrics
-  -> DWS agent_tool_daily_metrics
+  -> DWS dws_ai_llm_feature_request_1d
+  -> DWS dws_ai_agent_agent_run_1d
+  -> DWS dws_ai_agent_tool_tool_call_1d
 ```
 
 ---
@@ -55,10 +55,10 @@ Current ODS outputs:
 
 | Table | Path | Source Event Type |
 |---|---|---|
-| ods_llm_request_events | `data/warehouse/ods/llm_request/events.parquet` | `llm_request` |
-| ods_agent_run_events | `data/warehouse/ods/agent_run/events.parquet` | `agent_run` |
-| ods_agent_span_events | `data/warehouse/ods/agent_span/events.parquet` | `agent_span` |
-| ods_agent_tool_call_events | `data/warehouse/ods/agent_tool_call/events.parquet` | `agent_tool_call` |
+| ods_ai_observability_llm_request_events_di | `data/warehouse/ods/ods_ai_observability_llm_request_events_di/events.parquet` | `llm_request` |
+| ods_ai_observability_agent_run_events_di | `data/warehouse/ods/ods_ai_observability_agent_run_events_di/events.parquet` | `agent_run` |
+| ods_ai_observability_agent_span_events_di | `data/warehouse/ods/ods_ai_observability_agent_span_events_di/events.parquet` | `agent_span` |
+| ods_ai_observability_agent_tool_call_events_di | `data/warehouse/ods/ods_ai_observability_agent_tool_call_events_di/events.parquet` | `agent_tool_call` |
 
 ### Added ODS Metadata
 
@@ -75,13 +75,13 @@ One row per source event.
 
 ---
 
-## 4. DWD Table: llm_request_events
+## 4. DWD Table: dwd_ai_llm_request_di
 
 ### Business Meaning
 
 Each row represents one LLM API request. This table is the source of truth for model usage, latency, token cost, API reliability and prompt/response metadata. Raw prompt and response text stay in ODS/source data; DWD keeps hashes and length fields for safer analytics.
 
-When the request is produced by an Agent, it can be linked to `agent_run_events` and `agent_span_events` through `run_id` and `span_id`.
+When the request is produced by an Agent, it can be linked to `dwd_ai_agent_run_di` and `dwd_ai_agent_span_di` through `run_id` and `span_id`.
 
 ### Fields
 
@@ -138,7 +138,7 @@ Partitioned by `date`.
 
 ---
 
-## 5. DWD Table: agent_run_events
+## 5. DWD Table: dwd_ai_agent_run_di
 
 ### Business Meaning
 
@@ -196,7 +196,7 @@ Partitioned by `date`.
 
 ---
 
-## 6. DWD Table: agent_span_events
+## 6. DWD Table: dwd_ai_agent_span_di
 
 ### Business Meaning
 
@@ -250,11 +250,11 @@ Partitioned by `date`.
 
 ---
 
-## 7. DWD Table: agent_tool_call_events
+## 7. DWD Table: dwd_ai_agent_tool_call_di
 
 ### Business Meaning
 
-Each row represents one concrete Agent tool invocation. This table keeps detail that is too verbose for `agent_span_events`, especially tool arguments and returned payloads.
+Each row represents one concrete Agent tool invocation. This table keeps detail that is too verbose for `dwd_ai_agent_span_di`, especially tool arguments and returned payloads.
 
 Hermes trajectories are a natural source for this table because assistant messages can include `tool_calls`, and subsequent tool messages contain tool results.
 
@@ -292,7 +292,7 @@ Partitioned by `date`.
 
 ---
 
-## 8. DWS Table: llm_feature_daily_metrics
+## 8. DWS Table: dws_ai_llm_feature_request_1d
 
 ### Business Meaning
 
@@ -324,7 +324,7 @@ Daily feature-level LLM metrics for dashboard queries and Doris loading.
 
 ---
 
-## 9. DWS Table: agent_daily_metrics
+## 9. DWS Table: dws_ai_agent_agent_run_1d
 
 ### Business Meaning
 
@@ -367,7 +367,7 @@ Daily Agent-level metrics for operational dashboards. This table answers:
 
 ---
 
-## 10. DWS Table: agent_tool_daily_metrics
+## 10. DWS Table: dws_ai_agent_tool_tool_call_1d
 
 ### Business Meaning
 
@@ -405,17 +405,17 @@ Daily tool-level Agent metrics for dashboard queries. This table answers:
 ## 11. Entity Relationship
 
 ```text
-agent_run_events.run_id
+dwd_ai_agent_run_di.run_id
         |
-        +---- agent_span_events.run_id
+        +---- dwd_ai_agent_span_di.run_id
         |
-        +---- llm_request_events.run_id
+        +---- dwd_ai_llm_request_di.run_id
 
-agent_span_events.span_id
+dwd_ai_agent_span_di.span_id
         |
-        +---- llm_request_events.span_id
+        +---- dwd_ai_llm_request_di.span_id
         |
-        +---- agent_tool_call_events.span_id
+        +---- dwd_ai_agent_tool_call_di.span_id
 ```
 
 The `trace_id` field connects events across system boundaries. The `run_id` connects all events belonging to one Agent task. The `span_id` connects a specific LLM request to a specific Agent step.
@@ -446,13 +446,31 @@ Hermes trajectories.jsonl
 
 ---
 
-## 13. Planned Extensions
+## 13. Domain Expansion Tables
 
-The following are natural next steps, but they are not part of the current implemented schema:
+Tier 1 expands the runtime observability model beyond LLM and Agent execution:
 
-| Extension | Purpose |
-|---|---|
-| Retrieval observability fact | Query, embedding model, vector store, top_k, retrieved docs and retrieval latency |
-| Configurable model pricing | Externalized model pricing for cost calculation |
-| Prompt/version dimension | Prompt metadata, owner, version and release status |
-| Agent dimension | Agent metadata, owner, version and deployment status |
+| Table | Grain | Purpose |
+|---|---|---|
+| `dwd_ai_retrieval_request_di` | One row per retrieval request | Query hash, embedding model, knowledge base, top_k, returned hits and retrieval latency |
+| `dwd_ai_feedback_action_di` | One row per feedback action | Thumbs, ratings, regenerations, reports and response context |
+| `dwd_ai_guardrail_check_di` | One row per guardrail rule evaluation | Rule stage/category, trigger result, action taken, severity and guardrail latency |
+| `dws_ai_retrieval_knowledge_base_request_1d` | One daily row per app, knowledge base, embedding model and strategy | Retrieval volume, zero-result count, hit count, similarity and latency metrics |
+| `dws_ai_feedback_feature_action_1d` | One daily row per app, feature and agent | Feedback volume, positive/negative counts, regeneration/report counts and average rating |
+| `dws_ai_guardrail_rule_check_1d` | One daily row per app, rule category and action | Guardrail check volume, trigger/action counts, latency and distinct users |
+| `ads_observability_retrieval_daily_quality` | Daily retrieval quality mart | Hit rate, zero-result rate and latency breach flags |
+| `ads_observability_feedback_daily_satisfaction` | Daily satisfaction mart | Satisfaction rate, regeneration rate and breach flags |
+| `ads_observability_guardrail_daily_violation` | Daily guardrail violation mart | Trigger/block rates and policy-latency breach flags |
+
+Tier 2 starts with cost-governance tables:
+
+| Table | Grain | Purpose |
+|---|---|---|
+| `dim_team_df` | One row per team snapshot | Department, cost center, manager and monthly AI budget |
+| `dim_user_df` | One row per user snapshot | User-to-team mapping and AI access tier |
+| `dws_ai_cost_team_request_1d` | One daily row per team, app and model | Team-attributed request count, token count, estimated LLM cost and Agent cost |
+| `ads_observability_cost_daily_budget` | One daily row per team and app | MTD cost, projected month-end spend, budget utilization and breach flag |
+| `dwd_ai_evaluation_judgment_di` | One row per evaluation judgment | LLM-as-judge, human, ground-truth or classifier score for a request/run |
+| `dws_ai_evaluation_feature_judgment_1d` | One daily row per app, feature, evaluation dimension and evaluated model | Evaluation volume, pass/fail counts, average score, p10 score and evaluation latency |
+
+Remaining planned extensions include prompt/version, agent, model deployment, compliance and platform-health dimensions.

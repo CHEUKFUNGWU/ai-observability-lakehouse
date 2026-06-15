@@ -6,7 +6,7 @@ from app.logging_utils import get_logger, log_info
 from app.pipeline_metadata import append_pipeline_run
 from scripts.spark_utils import build_spark_session
 
-DEFAULT_OUTPUT_PATH = Path("data/warehouse/dim/dim_model.parquet")
+DEFAULT_OUTPUT_PATH = Path("data/warehouse/dim/dim_model_df.parquet")
 LOGGER = get_logger(__name__)
 
 

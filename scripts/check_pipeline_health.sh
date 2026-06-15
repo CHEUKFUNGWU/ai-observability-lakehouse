@@ -41,13 +41,25 @@ if [[ "${skip_serving}" == false ]]; then
   require_running_service doris-be
 fi
 
-if docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
+topics="$(
+  docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
   --bootstrap-server localhost:9092 \
-  --list | grep -qx 'ods_llm_request_events'; then
-  pass "Kafka topic ods_llm_request_events exists"
-else
-  fail "Kafka topic ods_llm_request_events is missing"
-fi
+  --list
+)"
+
+for topic in \
+  ods_ai_observability_llm_request_events_di \
+  ods_ai_observability_retrieval_events_di \
+  ods_ai_observability_feedback_events_di \
+  ods_ai_observability_guardrail_events_di \
+  ods_ai_observability_evaluation_events_di
+do
+  if grep -qx "${topic}" <<<"${topics}"; then
+    pass "Kafka topic ${topic} exists"
+  else
+    fail "Kafka topic ${topic} is missing"
+  fi
+done
 
 source_count="$(
   docker compose exec -T postgres psql \
@@ -74,8 +86,16 @@ payload = json.loads(sys.argv[1])
 jobs = payload.get("jobs", [])
 running_names = [job.get("name", "") for job in jobs if job.get("state") == "RUNNING"]
 expected = {
-    "insert-into_paimon_lake.dwd.llm_request_events": False,
-    "insert-into_paimon_lake.dws.llm_feature_daily_metrics": False,
+    "insert-into_paimon_lake.dwd.dwd_ai_llm_request_di": False,
+    "insert-into_paimon_lake.dwd.dwd_ai_retrieval_request_di": False,
+    "insert-into_paimon_lake.dwd.dwd_ai_feedback_action_di": False,
+    "insert-into_paimon_lake.dwd.dwd_ai_guardrail_check_di": False,
+    "insert-into_paimon_lake.dwd.dwd_ai_evaluation_judgment_di": False,
+    "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1d": False,
+    "insert-into_paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d": False,
+    "insert-into_paimon_lake.dws.dws_ai_feedback_feature_action_1d": False,
+    "insert-into_paimon_lake.dws.dws_ai_guardrail_rule_check_1d": False,
+    "insert-into_paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d": False,
 }
 for name in running_names:
     for expected_name in expected:

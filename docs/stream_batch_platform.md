@@ -61,9 +61,9 @@ The first streaming scope focuses on LLM request observability because it alread
 ```text
 postgres.public.llm_request_events
   -> Flink CDC source table
-  -> kafka_ods_llm_request_events
-  -> paimon_lake.dwd.llm_request_events
-  -> paimon_lake.dws.llm_feature_daily_metrics
+  -> ods_ai_observability_llm_request_events_di
+  -> paimon_lake.dwd.dwd_ai_llm_request_di
+  -> paimon_lake.dws.dws_ai_llm_feature_request_1d
 ```
 
 Agent and Hermes tool-call streams can follow the same pattern:

@@ -37,6 +37,8 @@ def test_catalog_sql_defines_paimon_lake():
     assert "CREATE DATABASE IF NOT EXISTS paimon_lake.ods" in sql
     assert "CREATE DATABASE IF NOT EXISTS paimon_lake.dwd" in sql
     assert "CREATE DATABASE IF NOT EXISTS paimon_lake.dws" in sql
+    assert "CREATE DATABASE IF NOT EXISTS paimon_lake.dim" in sql
+    assert "CREATE DATABASE IF NOT EXISTS paimon_lake.ads" in sql
 
 
 def test_source_sql_uses_postgres_cdc_connector():
@@ -55,11 +57,24 @@ def test_paimon_layers_use_expected_tables():
     dwd_sql = read_asset("flink/sql/03_dwd_paimon_tables.sql")
     dws_sql = read_asset("flink/sql/04_dws_paimon_tables.sql")
 
-    assert "kafka_ods_llm_request_events" in ods_sql
+    assert "ods_ai_observability_llm_request_events_di" in ods_sql
+    assert "ods_ai_observability_retrieval_events_di" in ods_sql
+    assert "ods_ai_observability_feedback_events_di" in ods_sql
+    assert "ods_ai_observability_guardrail_events_di" in ods_sql
+    assert "ods_ai_observability_evaluation_events_di" in ods_sql
     assert "'connector' = 'upsert-kafka'" in ods_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in ods_sql
-    assert "paimon_lake.dwd.llm_request_events" in dwd_sql
-    assert "paimon_lake.dws.llm_feature_daily_metrics" in dws_sql
+    assert "paimon_lake.dwd.dwd_ai_llm_request_di" in dwd_sql
+    assert "paimon_lake.dwd.dwd_ai_retrieval_request_di" in dwd_sql
+    assert "paimon_lake.dwd.dwd_ai_feedback_action_di" in dwd_sql
+    assert "paimon_lake.dwd.dwd_ai_guardrail_check_di" in dwd_sql
+    assert "paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in dwd_sql
+    assert "paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
+    assert "paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d" in dws_sql
+    assert "paimon_lake.dws.dws_ai_feedback_feature_action_1d" in dws_sql
+    assert "paimon_lake.dws.dws_ai_guardrail_rule_check_1d" in dws_sql
+    assert "paimon_lake.dws.dws_ai_cost_team_request_1d" in dws_sql
+    assert "paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d" in dws_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in dwd_sql
     assert "PARTITIONED BY (`date`)" in dws_sql
 
@@ -69,10 +84,18 @@ def test_flink_sql_layer_dependencies_are_explicit():
     dwd_sql = read_asset("flink/sql/20_build_dwd_from_kafka_ods.sql")
     dws_sql = read_asset("flink/sql/30_build_dws_from_dwd.sql")
 
-    assert "INSERT INTO kafka_ods_llm_request_events" in ingest_sql
+    assert "INSERT INTO ods_ai_observability_llm_request_events_di" in ingest_sql
     assert "FROM src_llm_request_events" in ingest_sql
-    assert "INSERT INTO paimon_lake.dwd.llm_request_events" in dwd_sql
-    assert "FROM kafka_ods_llm_request_events" in dwd_sql
+    assert "INSERT INTO paimon_lake.dwd.dwd_ai_llm_request_di" in dwd_sql
+    assert "INSERT INTO paimon_lake.dwd.dwd_ai_retrieval_request_di" in dwd_sql
+    assert "INSERT INTO paimon_lake.dwd.dwd_ai_feedback_action_di" in dwd_sql
+    assert "INSERT INTO paimon_lake.dwd.dwd_ai_guardrail_check_di" in dwd_sql
+    assert "INSERT INTO paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in dwd_sql
+    assert "FROM ods_ai_observability_llm_request_events_di" in dwd_sql
+    assert "FROM ods_ai_observability_retrieval_events_di" in dwd_sql
+    assert "FROM ods_ai_observability_feedback_events_di" in dwd_sql
+    assert "FROM ods_ai_observability_guardrail_events_di" in dwd_sql
+    assert "FROM ods_ai_observability_evaluation_events_di" in dwd_sql
     assert "request_id IS NOT NULL" in dwd_sql
     assert "created_at IS NOT NULL" in dwd_sql
     assert "prompt_tokens >= 0" in dwd_sql
@@ -82,8 +105,12 @@ def test_flink_sql_layer_dependencies_are_explicit():
     assert "status IN ('success', 'error')" in dwd_sql
     assert "estimated_cost_usd >= 0" in dwd_sql
     assert "mode IN ('mock', 'live', 'replay', 'hermes')" in dwd_sql
-    assert "INSERT INTO paimon_lake.dws.llm_feature_daily_metrics" in dws_sql
-    assert "FROM paimon_lake.dwd.llm_request_events" in dws_sql
+    assert "INSERT INTO paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
+    assert "INSERT INTO paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d" in dws_sql
+    assert "INSERT INTO paimon_lake.dws.dws_ai_feedback_feature_action_1d" in dws_sql
+    assert "INSERT INTO paimon_lake.dws.dws_ai_guardrail_rule_check_1d" in dws_sql
+    assert "INSERT INTO paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d" in dws_sql
+    assert "FROM paimon_lake.dwd.dwd_ai_llm_request_di" in dws_sql
     assert "CAST(MAX(latency_ms) AS BIGINT) AS max_latency_ms" in dws_sql
     assert "CAST(0 AS BIGINT) AS p95_latency_ms" in dws_sql
     assert "PERCENTILE_CONT(" not in dws_sql
@@ -95,11 +122,20 @@ def test_flink_verify_sql_covers_dwd_and_dws_layers():
 
     assert "SET 'execution.runtime-mode' = 'batch'" in dwd_sql
     assert "COUNT(*) AS dwd_row_count" in dwd_sql
-    assert "FROM paimon_lake.dwd.llm_request_events" in dwd_sql
+    assert "COUNT(*) AS dwd_retrieval_row_count" in dwd_sql
+    assert "COUNT(*) AS dwd_feedback_row_count" in dwd_sql
+    assert "COUNT(*) AS dwd_guardrail_row_count" in dwd_sql
+    assert "COUNT(*) AS dwd_evaluation_row_count" in dwd_sql
+    assert "FROM paimon_lake.dwd.dwd_ai_llm_request_di" in dwd_sql
     assert "SET 'execution.runtime-mode' = 'batch'" in dws_sql
     assert "COUNT(*) AS dws_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_retrieval_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_feedback_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_guardrail_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_cost_team_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_evaluation_metric_rows" in dws_sql
     assert "SUM(request_count) AS total_request_count" in dws_sql
-    assert "FROM paimon_lake.dws.llm_feature_daily_metrics" in dws_sql
+    assert "FROM paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
 
 
 def test_spark_paimon_table_bootstrap_matches_flink_keyed_tables():
@@ -208,9 +244,21 @@ def test_light_and_serving_demo_commands_are_split():
     assert "doris-fe" not in streaming_demo
     assert "make" not in streaming_demo
     assert "docker compose up -d doris-fe doris-be doris-init" in serving_demo
-    assert "ods_llm_request_events" in health_script
-    assert "insert-into_paimon_lake.dwd.llm_request_events" in health_script
-    assert "insert-into_paimon_lake.dws.llm_feature_daily_metrics" in health_script
+    assert "ods_ai_observability_llm_request_events_di" in health_script
+    assert "ods_ai_observability_retrieval_events_di" in health_script
+    assert "ods_ai_observability_feedback_events_di" in health_script
+    assert "ods_ai_observability_guardrail_events_di" in health_script
+    assert "ods_ai_observability_evaluation_events_di" in health_script
+    assert "insert-into_paimon_lake.dwd.dwd_ai_llm_request_di" in health_script
+    assert "insert-into_paimon_lake.dwd.dwd_ai_retrieval_request_di" in health_script
+    assert "insert-into_paimon_lake.dwd.dwd_ai_feedback_action_di" in health_script
+    assert "insert-into_paimon_lake.dwd.dwd_ai_guardrail_check_di" in health_script
+    assert "insert-into_paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in health_script
+    assert "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1d" in health_script
+    assert "insert-into_paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d" in health_script
+    assert "insert-into_paimon_lake.dws.dws_ai_feedback_feature_action_1d" in health_script
+    assert "insert-into_paimon_lake.dws.dws_ai_guardrail_rule_check_1d" in health_script
+    assert "insert-into_paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d" in health_script
 
 
 def test_flink_warehouse_prepare_script_creates_checkpoint_dirs():

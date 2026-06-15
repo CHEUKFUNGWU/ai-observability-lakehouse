@@ -84,14 +84,14 @@ RUN wget -q -P /opt/flink/lib \
 **Create:** `flink/sql/02_ods_kafka_tables.sql`
 
 ```sql
-CREATE TABLE IF NOT EXISTS kafka_ods_llm_request_events (
+CREATE TABLE IF NOT EXISTS ods_ai_observability_llm_request_events_di (
     request_id STRING,
     -- ... all source fields ...
     created_at TIMESTAMP(3),
     `date` DATE
 ) WITH (
     'connector' = 'kafka',
-    'topic' = 'ods_llm_request_events',
+    'topic' = 'ods_ai_observability_llm_request_events_di',
     'properties.bootstrap.servers' = 'kafka:9092',
     'format' = 'json',
     'json.fail-on-missing-field' = 'false',
@@ -104,11 +104,11 @@ CREATE TABLE IF NOT EXISTS kafka_ods_llm_request_events (
 
 **Rename + modify:** `10_ingest_ods_from_cdc.sql` → `10_ingest_ods_to_kafka.sql`
 
-- Change target: `INSERT INTO kafka_ods_llm_request_events SELECT ... FROM src_llm_request_events`
+- Change target: `INSERT INTO ods_ai_observability_llm_request_events_di SELECT ... FROM src_llm_request_events`
 
 **Rename + modify:** `20_build_dwd_from_ods.sql` → `20_build_dwd_from_kafka_ods.sql`
 
-- Change source: `FROM kafka_ods_llm_request_events` instead of `FROM paimon_lake.ods.llm_request_events`
+- Change source: `FROM ods_ai_observability_llm_request_events_di` instead of `FROM paimon_lake.ods.dwd_ai_llm_request_di`
 - Keep all COALESCE/WHERE validation logic unchanged
 
 **Delete:** `flink/sql/90_verify_ods_count.sql` (Kafka topics are not batch-scannable)
@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS kafka_ods_llm_request_events (
 ```bash
 docker compose exec -T kafka \
   /opt/kafka/bin/kafka-topics.sh --create \
-    --topic ods_llm_request_events \
+    --topic ods_ai_observability_llm_request_events_di \
     --partitions 4 \
     --replication-factor 1 \
     --config retention.ms=172800000 \
@@ -300,7 +300,7 @@ def split_valid_quarantine(df: DataFrame) -> tuple[DataFrame, DataFrame]:
 
 **File:** `scripts/spark_transform_llm_events.py`
 
-After `transform_llm_events()`, call `validate_llm_events()`. Write valid events to DWD, write quarantine events to `data/warehouse/quarantine/llm_request/events.parquet`.
+After `transform_llm_events()`, call `validate_llm_events()`. Write valid events to DWD, write quarantine events to `data/warehouse/quarantine/dwd_ai_llm_request_di/events.parquet`.
 
 Log both counts:
 
@@ -352,12 +352,12 @@ class ModelDimension:
 
 **Create:** `scripts/spark_build_dim_model.py`
 
-Build a `dim_model` Parquet table from `app/dim_model.py` definitions.
+Build a `dim_model_df` Parquet table from `app/dim_model.py` definitions.
 
 **Add to:** `sql/create_doris_tables.sql`
 
 ```sql
-CREATE TABLE IF NOT EXISTS ai_observability.dim_model (
+CREATE TABLE IF NOT EXISTS ai_observability.dim_model_df (
     model_name String,
     provider String,
     input_price_per_1m_tokens Float64,
@@ -377,13 +377,13 @@ PROPERTIES (
 
 **Create:** `scripts/spark_build_dim_agent.py`
 
-Extract unique agents from DWD `agent_run_events` and build a `dim_agent` table with agent_id, agent_name, latest version, first_seen, last_seen.
+Extract unique agents from DWD `dwd_ai_agent_run_di` and build a `dim_agent` table with agent_id, agent_name, latest version, first_seen, last_seen.
 
 ### 4.3 Update Dashboard Queries
 
 **File:** `sql/doris_dashboard_queries.sql`
 
-Add a query that joins `dws_llm_feature_daily_metrics` with `dim_model` to show cost per model with pricing metadata:
+Add a query that joins `dws_ai_llm_feature_request_1d` with `dim_model_df` to show cost per model with pricing metadata:
 
 ```sql
 SELECT
@@ -395,10 +395,10 @@ SELECT
     a.estimated_cost_usd
 FROM (
     SELECT model_name, sum(request_count) AS request_count, sum(total_tokens) AS total_tokens, sum(estimated_cost_usd) AS estimated_cost_usd
-    FROM ai_observability.dws_llm_feature_daily_metrics
+    FROM ai_observability.dws_ai_llm_feature_request_1d
     GROUP BY model_name
 ) a
-JOIN ai_observability.dim_model m ON a.model_name = m.model_name
+JOIN ai_observability.dim_model_df m ON a.model_name = m.model_name
 ORDER BY estimated_cost_usd DESC;
 ```
 
@@ -419,7 +419,7 @@ uv run python -m scripts.spark_build_dim_model
 
 **Create:** `scripts/spark_build_ads_cost_anomaly.py`
 
-Using a window function over `dws_llm_feature_daily_metrics`:
+Using a window function over `dws_ai_llm_feature_request_1d`:
 
 ```python
 window = Window.partitionBy("app_name", "feature_name", "model_name").orderBy("date")
@@ -435,7 +435,7 @@ metrics.withColumn("prev_day_cost", F.lag("estimated_cost_usd").over(window)) \
        )
 ```
 
-Output: `data/warehouse/ads/cost_anomaly_daily.parquet`
+Output: `data/warehouse/ads/ads_observability_cost_feature_anomaly.parquet`
 
 Add Doris table for anomaly alerts.
 
@@ -455,7 +455,7 @@ rules:
 
 **Create:** `scripts/spark_build_ads_sla_daily.py`
 
-Join ADS metrics with SLA rules. Output: `sla_daily_report` with `is_latency_breach`, `is_error_breach` columns.
+Join ADS metrics with SLA rules. Output: `ads_observability_sla_feature_report` with `is_latency_breach`, `is_error_breach` columns.
 
 ### 5.3 Prompt Version Impact Analysis
 
@@ -511,7 +511,7 @@ SELECT
     SUM(error_count) AS error_count,
     SUM(total_tokens) AS total_tokens,
     SUM(estimated_cost_usd) AS estimated_cost_usd
-FROM ai_observability.dws_llm_feature_daily_metrics
+FROM ai_observability.dws_ai_llm_feature_request_1d
 GROUP BY `date`;
 ```
 
@@ -541,7 +541,7 @@ After each Spark script runs, log a row to `data/warehouse/pipeline_runs.jsonl`:
 
 The span_metrics join key `["date", "agent_id"]` is narrower than the run_metrics key `["date", "app_name", "agent_id", "agent_name", "task_type"]`. This duplicates span counts across task types.
 
-Fix: add a comment documenting this as a known limitation, or restructure so span metrics are a separate ADS output (the `agent_tool_daily_metrics` table already handles tool-level metrics separately).
+Fix: add a comment documenting this as a known limitation, or restructure so span metrics are a separate ADS output (the `dws_ai_agent_tool_tool_call_1d` table already handles tool-level metrics separately).
 
 ### 6.5 Remove `span_failure_rate` from Agent ADS
 

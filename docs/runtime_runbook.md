@@ -133,7 +133,7 @@ scripts/check_pipeline_health.sh --skip-serving
 The health check verifies:
 
 - Required Docker Compose services are running.
-- Kafka topic `ods_llm_request_events` exists.
+- Kafka topic `ods_ai_observability_llm_request_events_di` exists.
 - Postgres source table `public.llm_request_events` has rows.
 - Flink REST API is reachable.
 - DWD and DWS streaming jobs are running.

@@ -154,9 +154,9 @@ The first stream-batch path focuses on LLM request events:
 ```text
 postgres.public.llm_request_events
 → Flink CDC source table
-→ kafka_ods_llm_request_events
-→ paimon_lake.dwd.llm_request_events
-→ paimon_lake.dws.llm_feature_daily_metrics
+→ ods_ai_observability_llm_request_events_di
+→ paimon_lake.dwd.dwd_ai_llm_request_di
+→ paimon_lake.dws.dws_ai_llm_feature_request_1d
 ```
 
 Flink SQL assets are stored in:
@@ -255,8 +255,8 @@ LLM backfill path:
 ```text
 mock JSONL events
 → transform + validate in Spark
-→ paimon_lake.dwd.llm_request_events
-→ paimon_lake.dws.llm_feature_daily_metrics
+→ paimon_lake.dwd.dwd_ai_llm_request_di
+→ paimon_lake.dws.dws_ai_llm_feature_request_1d
 → quarantine Parquet for rejected rows
 ```
 
@@ -276,7 +276,7 @@ Default local outputs:
 
 ```text
 data/raw/mock_llm_requests/events.jsonl
-data/warehouse/quarantine/llm_request/events.parquet
+data/warehouse/quarantine/dwd_ai_llm_request_di/events.parquet
 data/paimon/
 ```
 
@@ -299,11 +299,11 @@ Default Agent outputs:
 ```text
 data/raw/mock_agent_runs/events.jsonl
 data/raw/mock_agent_spans/events.jsonl
-data/warehouse/ods/agent_run/events.parquet
-data/warehouse/ods/agent_span/events.parquet
-data/warehouse/agent_run/events.parquet
-data/warehouse/agent_span/events.parquet
-data/warehouse/dws/agent_daily_metrics.parquet
+data/warehouse/ods/ods_ai_observability_agent_run_events_di/events.parquet
+data/warehouse/ods/ods_ai_observability_agent_span_events_di/events.parquet
+data/warehouse/dwd/dwd_ai_agent_run_di/events.parquet
+data/warehouse/dwd/dwd_ai_agent_span_di/events.parquet
+data/warehouse/dws/dws_ai_agent_agent_run_1d.parquet
 ```
 
 Hermes Agent trajectories can still be used as a real Agent source:
@@ -326,22 +326,22 @@ Build Hermes DWD tables from prepared event parquet:
 
 ```bash
 uv run python -m scripts.spark_transform_agent_events \
-  --run-input data/warehouse/ods/hermes_agent_run/events.parquet \
-  --span-input data/warehouse/ods/hermes_agent_span/events.parquet \
-  --run-output data/warehouse/hermes_agent_run/events.parquet \
-  --span-output data/warehouse/hermes_agent_span/events.parquet
+  --run-input data/warehouse/ods/ods_ai_observability_agent_run_events_di/events.parquet \
+  --span-input data/warehouse/ods/ods_ai_observability_agent_span_events_di/events.parquet \
+  --run-output data/warehouse/dwd/dwd_ai_agent_run_di/events.parquet \
+  --span-output data/warehouse/dwd/dwd_ai_agent_span_di/events.parquet
 
 uv run python -m scripts.spark_transform_agent_tool_calls \
-  --input data/warehouse/ods/hermes_agent_tool_call/events.parquet \
-  --output data/warehouse/hermes_agent_tool_call/events.parquet
+  --input data/warehouse/ods/ods_ai_observability_agent_tool_call_events_di/events.parquet \
+  --output data/warehouse/dwd/dwd_ai_agent_tool_call_di/events.parquet
 ```
 
 Build Hermes tool-call DWS metrics:
 
 ```bash
 uv run python -m scripts.spark_build_dws_agent_tool_daily_metrics \
-  --input data/warehouse/hermes_agent_tool_call/events.parquet \
-  --output data/warehouse/dws/hermes_agent_tool_daily_metrics.parquet
+  --input data/warehouse/dwd/dwd_ai_agent_tool_call_di/events.parquet \
+  --output data/warehouse/dws/dws_ai_agent_tool_tool_call_1d.parquet
 ```
 
 Run tests:
@@ -377,7 +377,7 @@ Check the loaded row count:
 
 ```bash
 docker compose exec -T doris-fe mysql -h 127.0.0.1 -P 9030 -u root \
-  --query "SELECT count(*) FROM ai_observability.dws_llm_feature_daily_metrics"
+  --query "SELECT count(*) FROM ai_observability.dws_ai_llm_feature_request_1d"
 ```
 
 Dashboard SQL examples are stored in:
@@ -477,5 +477,6 @@ It combines practical AI engineering and data engineering:
 ## 14. Future Roadmap
 
 - Superset, Grafana or a custom dashboard application
-- Dedicated RAG retrieval observability facts
-- Additional dimensions for agents, prompts, and retrieval corpora
+- Tier 2 enterprise governance beyond cost budgets and evaluation: model deployment events
+- Additional dimensions for agents and prompts
+- Tier 3 compliance, multi-agent orchestration and platform-health facts

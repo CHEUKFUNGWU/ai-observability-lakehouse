@@ -9,8 +9,8 @@ from app.pipeline_metadata import append_pipeline_run
 from scripts.spark_utils import build_paimon_spark_session
 
 DEFAULT_RULES_PATH = Path("config/sla_rules.yaml")
-DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/sla_daily_report.parquet")
-DEFAULT_INPUT_TABLE = "paimon_lake.dws.llm_feature_daily_metrics"
+DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/ads_observability_sla_feature_report.parquet")
+DEFAULT_INPUT_TABLE = "paimon_lake.dws.dws_ai_llm_feature_request_1d"
 LOGGER = get_logger(__name__)
 
 

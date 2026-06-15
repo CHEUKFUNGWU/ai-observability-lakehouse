@@ -36,13 +36,13 @@ Implemented source/domain models:
 Relationship:
 
 ```text
-agent_run_events.run_id
-  -> agent_span_events.run_id
-  -> llm_request_events.run_id
+dwd_ai_agent_run_di.run_id
+  -> dwd_ai_agent_span_di.run_id
+  -> dwd_ai_llm_request_di.run_id
 
-agent_span_events.span_id
-  -> llm_request_events.span_id
-  -> agent_tool_call_events.span_id
+dwd_ai_agent_span_di.span_id
+  -> dwd_ai_llm_request_di.span_id
+  -> dwd_ai_agent_tool_call_di.span_id
 ```
 
 ## 3. Source Adapters
@@ -64,8 +64,8 @@ LLM path:
 ```text
 raw llm_request JSONL
   -> scripts.spark_paimon_backfill
-  -> paimon_lake.dwd.llm_request_events
-  -> paimon_lake.dws.llm_feature_daily_metrics
+  -> paimon_lake.dwd.dwd_ai_llm_request_di
+  -> paimon_lake.dws.dws_ai_llm_feature_request_1d
 ```
 
 Agent path:
@@ -146,20 +146,20 @@ sql/create_doris_tables.sql
 
 Implemented Doris DWD tables:
 
-- `dwd_llm_request_events`
-- `dwd_agent_run_events`
-- `dwd_agent_span_events`
-- `dwd_agent_tool_call_events`
+- `dwd_ai_llm_request_di`
+- `dwd_ai_agent_run_di`
+- `dwd_ai_agent_span_di`
+- `dwd_ai_agent_tool_call_di`
 
 Implemented Doris DWS tables:
 
-- `dws_llm_feature_daily_metrics`
-- `dws_agent_daily_metrics`
-- `dws_agent_tool_daily_metrics`
-- `ads_cost_anomaly_daily`
-- `ads_sla_daily_report`
-- `ads_prompt_version_daily_metrics`
-- `dim_model`
+- `dws_ai_llm_feature_request_1d`
+- `dws_ai_agent_agent_run_1d`
+- `dws_ai_agent_tool_tool_call_1d`
+- `ads_observability_cost_feature_anomaly`
+- `ads_observability_sla_feature_report`
+- `ads_observability_prompt_prompt_version_metrics`
+- `dim_model_df`
 
 Loader:
 

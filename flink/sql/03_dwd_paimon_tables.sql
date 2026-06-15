@@ -1,6 +1,6 @@
 -- DWD contains typed and validated business facts.
 
-CREATE TABLE IF NOT EXISTS paimon_lake.dwd.llm_request_events (
+CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_llm_request_di (
     request_id STRING,
     trace_id STRING,
     run_id STRING,
@@ -42,6 +42,123 @@ CREATE TABLE IF NOT EXISTS paimon_lake.dwd.llm_request_events (
     created_at TIMESTAMP(3),
     `date` DATE,
     PRIMARY KEY (request_id) NOT ENFORCED
+) WITH (
+    'bucket' = '4'
+);
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_retrieval_request_di (
+    retrieval_id STRING,
+    trace_id STRING,
+    run_id STRING,
+    span_id STRING,
+    request_id STRING,
+    agent_id STRING,
+    app_name STRING,
+    feature_name STRING,
+    user_id STRING,
+    knowledge_base_id STRING,
+    knowledge_base_name STRING,
+    embedding_model STRING,
+    retrieval_strategy STRING,
+    query_text_hash STRING,
+    query_length INT,
+    top_k INT,
+    returned_count INT,
+    hit_count INT,
+    max_similarity_score DOUBLE,
+    min_similarity_score DOUBLE,
+    avg_similarity_score DOUBLE,
+    embedding_latency_ms INT,
+    search_latency_ms INT,
+    total_latency_ms INT,
+    status STRING,
+    error_type STRING,
+    mode STRING,
+    environment STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (retrieval_id) NOT ENFORCED
+) WITH (
+    'bucket' = '4'
+);
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_feedback_action_di (
+    feedback_id STRING,
+    trace_id STRING,
+    request_id STRING,
+    run_id STRING,
+    session_id STRING,
+    conversation_id STRING,
+    user_id STRING,
+    app_name STRING,
+    feature_name STRING,
+    agent_id STRING,
+    feedback_type STRING,
+    rating_value INT,
+    feedback_text_hash STRING,
+    feedback_text_length INT,
+    response_latency_ms INT,
+    model_name STRING,
+    prompt_version STRING,
+    mode STRING,
+    environment STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (feedback_id) NOT ENFORCED
+) WITH (
+    'bucket' = '4'
+);
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_guardrail_check_di (
+    guardrail_event_id STRING,
+    trace_id STRING,
+    request_id STRING,
+    run_id STRING,
+    user_id STRING,
+    app_name STRING,
+    feature_name STRING,
+    guardrail_stage STRING,
+    rule_name STRING,
+    rule_category STRING,
+    triggered BOOLEAN,
+    action_taken STRING,
+    severity STRING,
+    matched_pattern_hash STRING,
+    input_text_length INT,
+    guardrail_latency_ms INT,
+    model_name STRING,
+    prompt_version STRING,
+    mode STRING,
+    environment STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (guardrail_event_id) NOT ENFORCED
+) WITH (
+    'bucket' = '4'
+);
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_evaluation_judgment_di (
+    evaluation_id STRING,
+    trace_id STRING,
+    request_id STRING,
+    run_id STRING,
+    app_name STRING,
+    feature_name STRING,
+    evaluator_type STRING,
+    evaluator_model STRING,
+    evaluation_dimension STRING,
+    score DOUBLE,
+    raw_score STRING,
+    pass_threshold DOUBLE,
+    passed BOOLEAN,
+    evaluated_model_name STRING,
+    evaluated_prompt_version STRING,
+    evaluation_latency_ms INT,
+    mode STRING,
+    environment STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (evaluation_id) NOT ENFORCED
 ) WITH (
     'bucket' = '4'
 );
