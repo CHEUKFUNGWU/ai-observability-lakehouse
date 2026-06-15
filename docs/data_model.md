@@ -472,5 +472,7 @@ Tier 2 starts with cost-governance tables:
 | `ads_observability_cost_daily_budget` | One daily row per team and app | MTD cost, projected month-end spend, budget utilization and breach flag |
 | `dwd_ai_evaluation_judgment_di` | One row per evaluation judgment | LLM-as-judge, human, ground-truth or classifier score for a request/run |
 | `dws_ai_evaluation_feature_judgment_1d` | One daily row per app, feature, evaluation dimension and evaluated model | Evaluation volume, pass/fail counts, average score, p10 score and evaluation latency |
+| `dim_prompt_version_df` | One row per prompt version snapshot | Prompt metadata, owner team, release status and A/B group |
+| `dws_ai_prompt_version_request_1d` | One daily row per prompt, version and model | Request volume, success/error counts, latency, tokens, cost and joined evaluation score |
 
-Remaining planned extensions include prompt/version, agent, model deployment, compliance and platform-health dimensions.
+Remaining planned extensions include agent, model deployment, compliance and platform-health dimensions.

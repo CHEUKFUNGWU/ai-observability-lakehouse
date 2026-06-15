@@ -75,6 +75,7 @@ def test_paimon_layers_use_expected_tables():
     assert "paimon_lake.dws.dws_ai_guardrail_rule_check_1d" in dws_sql
     assert "paimon_lake.dws.dws_ai_cost_team_request_1d" in dws_sql
     assert "paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d" in dws_sql
+    assert "paimon_lake.dws.dws_ai_prompt_version_request_1d" in dws_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in dwd_sql
     assert "PARTITIONED BY (`date`)" in dws_sql
 
@@ -134,6 +135,7 @@ def test_flink_verify_sql_covers_dwd_and_dws_layers():
     assert "COUNT(*) AS dws_guardrail_metric_rows" in dws_sql
     assert "COUNT(*) AS dws_cost_team_metric_rows" in dws_sql
     assert "COUNT(*) AS dws_evaluation_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_prompt_version_metric_rows" in dws_sql
     assert "SUM(request_count) AS total_request_count" in dws_sql
     assert "FROM paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
 

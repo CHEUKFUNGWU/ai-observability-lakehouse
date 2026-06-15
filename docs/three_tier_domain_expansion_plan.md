@@ -468,6 +468,8 @@ Implementation status: `dwd_ai_evaluation_judgment_di` and `dws_ai_evaluation_fe
 
 Upgrade of the existing ADS table. Grouping keys: `date`, `prompt_id`, `prompt_version`, `model_name`. Metrics: request_count, success_count, error_count, avg_latency_ms, p95_latency_ms, total_tokens, estimated_cost_usd, avg_evaluation_score (joined from evaluation DWS).
 
+Implementation status: `dim_prompt_version_df` and `dws_ai_prompt_version_request_1d` are implemented as the third Tier 2 slice. The DWS builder joins evaluation scores by `date`, evaluated prompt version, and evaluated model name so prompt A/B comparisons can use quality, latency, error, token, and cost metrics together.
+
 This table enables prompt A/B test analysis and version comparison directly.
 
 ---

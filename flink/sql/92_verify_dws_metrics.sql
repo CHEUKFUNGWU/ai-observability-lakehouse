@@ -30,3 +30,8 @@ SELECT
     COUNT(*) AS dws_evaluation_metric_rows,
     SUM(evaluation_cnt_1d) AS total_evaluation_cnt_1d
 FROM paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d;
+
+SELECT
+    COUNT(*) AS dws_prompt_version_metric_rows,
+    SUM(request_cnt_1d) AS total_prompt_version_request_cnt_1d
+FROM paimon_lake.dws.dws_ai_prompt_version_request_1d;

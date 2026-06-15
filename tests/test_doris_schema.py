@@ -23,11 +23,13 @@ def test_doris_schema_defines_llm_agent_and_tool_tables():
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_guardrail_rule_check_1d" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_cost_team_request_1d" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_evaluation_feature_judgment_1d" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_prompt_version_request_1d" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_model_df" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_knowledge_base_df" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_guardrail_rule_df" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_team_df" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_user_df" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_prompt_version_df" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_feature_anomaly" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_sla_feature_report" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_prompt_prompt_version_metrics" in sql
@@ -77,3 +79,5 @@ def test_doris_paimon_catalog_sql_assets_exist():
     assert "FROM paimon_lake.dws.dws_ai_cost_team_request_1d" in sync_sql
     assert "INSERT INTO ai_observability.dws_ai_evaluation_feature_judgment_1d" in sync_sql
     assert "FROM paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d" in sync_sql
+    assert "INSERT INTO ai_observability.dws_ai_prompt_version_request_1d" in sync_sql
+    assert "FROM paimon_lake.dws.dws_ai_prompt_version_request_1d" in sync_sql
