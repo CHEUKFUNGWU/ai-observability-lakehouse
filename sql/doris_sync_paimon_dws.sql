@@ -5,6 +5,7 @@ TRUNCATE TABLE ai_observability.dws_ai_guardrail_rule_check_1d;
 TRUNCATE TABLE ai_observability.dws_ai_cost_team_request_1d;
 TRUNCATE TABLE ai_observability.dws_ai_evaluation_feature_judgment_1d;
 TRUNCATE TABLE ai_observability.dws_ai_prompt_version_request_1d;
+TRUNCATE TABLE ai_observability.dws_ai_llm_feature_env_request_1d;
 
 INSERT INTO ai_observability.dws_ai_llm_feature_request_1d
 SELECT *
@@ -33,3 +34,7 @@ FROM paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d;
 INSERT INTO ai_observability.dws_ai_prompt_version_request_1d
 SELECT *
 FROM paimon_lake.dws.dws_ai_prompt_version_request_1d;
+
+INSERT INTO ai_observability.dws_ai_llm_feature_env_request_1d
+SELECT *
+FROM paimon_lake.dws.dws_ai_llm_feature_env_request_1d;

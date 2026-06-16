@@ -518,6 +518,8 @@ With team and user dimensions in place, existing DWS tables gain new grouping ke
 | `dws_ai_llm_feature_request_1d` | + `environment` | `dws_ai_llm_feature_env_request_1d` |
 | `dws_ai_agent_agent_run_1d` | + `team_id` | `dws_ai_agent_team_run_1d` |
 
+Implementation status: `dws_ai_llm_feature_env_request_1d` is implemented as the first Tier 2 granularity expansion. It reuses `dwd_ai_llm_request_di` and groups by date, app, feature, model, and environment for prod/staging/dev comparisons.
+
 ---
 
 ### 4.7 Tier 2 Implementation Approach

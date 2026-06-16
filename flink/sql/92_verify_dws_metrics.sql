@@ -35,3 +35,8 @@ SELECT
     COUNT(*) AS dws_prompt_version_metric_rows,
     SUM(request_cnt_1d) AS total_prompt_version_request_cnt_1d
 FROM paimon_lake.dws.dws_ai_prompt_version_request_1d;
+
+SELECT
+    COUNT(*) AS dws_llm_feature_env_metric_rows,
+    SUM(request_cnt_1d) AS total_feature_env_request_cnt_1d
+FROM paimon_lake.dws.dws_ai_llm_feature_env_request_1d;
