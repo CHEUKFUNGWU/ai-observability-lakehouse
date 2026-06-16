@@ -15,3 +15,6 @@ FROM paimon_lake.dwd.dwd_ai_guardrail_check_di;
 
 SELECT COUNT(*) AS dwd_evaluation_row_count
 FROM paimon_lake.dwd.dwd_ai_evaluation_judgment_di;
+
+SELECT COUNT(*) AS dwd_model_deployment_row_count
+FROM paimon_lake.dwd.dwd_ai_model_deployment_di;

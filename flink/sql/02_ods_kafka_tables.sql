@@ -199,3 +199,28 @@ CREATE TABLE IF NOT EXISTS ods_ai_observability_evaluation_events_di (
     'value.json.fail-on-missing-field' = 'false',
     'value.json.ignore-parse-errors' = 'true'
 );
+
+CREATE TABLE IF NOT EXISTS ods_ai_observability_model_deployment_events_di (
+    deployment_id STRING,
+    model_name STRING,
+    model_version STRING,
+    provider STRING,
+    deployment_action STRING,
+    traffic_percentage DOUBLE,
+    target_environment STRING,
+    deployer_user_id STRING,
+    deploy_reason STRING,
+    status STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (deployment_id) NOT ENFORCED
+) WITH (
+    'connector' = 'upsert-kafka',
+    'topic' = 'ods_ai_observability_model_deployment_events_di',
+    'properties.bootstrap.servers' = 'kafka:9092',
+    'properties.group.id' = 'flink-ods-model-deployment-events',
+    'key.format' = 'json',
+    'value.format' = 'json',
+    'value.json.fail-on-missing-field' = 'false',
+    'value.json.ignore-parse-errors' = 'true'
+);

@@ -62,6 +62,7 @@ def test_paimon_layers_use_expected_tables():
     assert "ods_ai_observability_feedback_events_di" in ods_sql
     assert "ods_ai_observability_guardrail_events_di" in ods_sql
     assert "ods_ai_observability_evaluation_events_di" in ods_sql
+    assert "ods_ai_observability_model_deployment_events_di" in ods_sql
     assert "'connector' = 'upsert-kafka'" in ods_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in ods_sql
     assert "paimon_lake.dwd.dwd_ai_llm_request_di" in dwd_sql
@@ -69,6 +70,7 @@ def test_paimon_layers_use_expected_tables():
     assert "paimon_lake.dwd.dwd_ai_feedback_action_di" in dwd_sql
     assert "paimon_lake.dwd.dwd_ai_guardrail_check_di" in dwd_sql
     assert "paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in dwd_sql
+    assert "paimon_lake.dwd.dwd_ai_model_deployment_di" in dwd_sql
     assert "paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
     assert "paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d" in dws_sql
     assert "paimon_lake.dws.dws_ai_feedback_feature_action_1d" in dws_sql
@@ -92,11 +94,13 @@ def test_flink_sql_layer_dependencies_are_explicit():
     assert "INSERT INTO paimon_lake.dwd.dwd_ai_feedback_action_di" in dwd_sql
     assert "INSERT INTO paimon_lake.dwd.dwd_ai_guardrail_check_di" in dwd_sql
     assert "INSERT INTO paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in dwd_sql
+    assert "INSERT INTO paimon_lake.dwd.dwd_ai_model_deployment_di" in dwd_sql
     assert "FROM ods_ai_observability_llm_request_events_di" in dwd_sql
     assert "FROM ods_ai_observability_retrieval_events_di" in dwd_sql
     assert "FROM ods_ai_observability_feedback_events_di" in dwd_sql
     assert "FROM ods_ai_observability_guardrail_events_di" in dwd_sql
     assert "FROM ods_ai_observability_evaluation_events_di" in dwd_sql
+    assert "FROM ods_ai_observability_model_deployment_events_di" in dwd_sql
     assert "request_id IS NOT NULL" in dwd_sql
     assert "created_at IS NOT NULL" in dwd_sql
     assert "prompt_tokens >= 0" in dwd_sql
@@ -127,6 +131,7 @@ def test_flink_verify_sql_covers_dwd_and_dws_layers():
     assert "COUNT(*) AS dwd_feedback_row_count" in dwd_sql
     assert "COUNT(*) AS dwd_guardrail_row_count" in dwd_sql
     assert "COUNT(*) AS dwd_evaluation_row_count" in dwd_sql
+    assert "COUNT(*) AS dwd_model_deployment_row_count" in dwd_sql
     assert "FROM paimon_lake.dwd.dwd_ai_llm_request_di" in dwd_sql
     assert "SET 'execution.runtime-mode' = 'batch'" in dws_sql
     assert "COUNT(*) AS dws_metric_rows" in dws_sql
@@ -251,11 +256,13 @@ def test_light_and_serving_demo_commands_are_split():
     assert "ods_ai_observability_feedback_events_di" in health_script
     assert "ods_ai_observability_guardrail_events_di" in health_script
     assert "ods_ai_observability_evaluation_events_di" in health_script
+    assert "ods_ai_observability_model_deployment_events_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_llm_request_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_retrieval_request_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_feedback_action_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_guardrail_check_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in health_script
+    assert "insert-into_paimon_lake.dwd.dwd_ai_model_deployment_di" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1d" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_feedback_feature_action_1d" in health_script

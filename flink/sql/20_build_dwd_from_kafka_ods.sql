@@ -194,3 +194,25 @@ WHERE evaluation_id IS NOT NULL
   AND pass_threshold BETWEEN 0.0 AND 1.0
   AND evaluation_latency_ms > 0
   AND mode IN ('mock', 'live', 'offline');
+
+INSERT INTO paimon_lake.dwd.dwd_ai_model_deployment_di
+SELECT
+    deployment_id,
+    model_name,
+    model_version,
+    provider,
+    deployment_action,
+    traffic_percentage,
+    target_environment,
+    deployer_user_id,
+    COALESCE(deploy_reason, '') AS deploy_reason,
+    status,
+    created_at,
+    `date`
+FROM ods_ai_observability_model_deployment_events_di
+WHERE deployment_id IS NOT NULL
+  AND created_at IS NOT NULL
+  AND deployment_action IN ('deploy', 'rollback', 'scale', 'canary_start', 'canary_promote', 'canary_abort')
+  AND traffic_percentage BETWEEN 0.0 AND 100.0
+  AND target_environment IN ('dev', 'staging', 'prod')
+  AND status IN ('success', 'failed', 'in_progress');

@@ -8,6 +8,7 @@ DROP TABLE IF EXISTS ai_observability.dwd_ai_retrieval_request_di;
 DROP TABLE IF EXISTS ai_observability.dwd_ai_feedback_action_di;
 DROP TABLE IF EXISTS ai_observability.dwd_ai_guardrail_check_di;
 DROP TABLE IF EXISTS ai_observability.dwd_ai_evaluation_judgment_di;
+DROP TABLE IF EXISTS ai_observability.dwd_ai_model_deployment_di;
 DROP TABLE IF EXISTS ai_observability.dws_ai_llm_feature_request_1d;
 DROP TABLE IF EXISTS ai_observability.dws_ai_agent_agent_run_1d;
 DROP TABLE IF EXISTS ai_observability.dws_ai_agent_tool_tool_call_1d;
@@ -23,6 +24,7 @@ DROP TABLE IF EXISTS ai_observability.dim_guardrail_rule_df;
 DROP TABLE IF EXISTS ai_observability.dim_team_df;
 DROP TABLE IF EXISTS ai_observability.dim_user_df;
 DROP TABLE IF EXISTS ai_observability.dim_prompt_version_df;
+DROP TABLE IF EXISTS ai_observability.dim_model_version_df;
 DROP TABLE IF EXISTS ai_observability.ads_observability_cost_feature_anomaly;
 DROP TABLE IF EXISTS ai_observability.ads_observability_sla_feature_report;
 DROP TABLE IF EXISTS ai_observability.ads_observability_prompt_prompt_version_metrics;
@@ -404,6 +406,35 @@ PROPERTIES (
     "dynamic_partition.create_history_partition" = "true"
 );
 
+CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_model_deployment_di
+(
+    `date` DATE NOT NULL,
+    deployment_id VARCHAR(128) NOT NULL,
+    model_name VARCHAR(256) NOT NULL,
+    model_version VARCHAR(128) NOT NULL,
+    provider VARCHAR(128) NOT NULL,
+    deployment_action VARCHAR(64) NOT NULL,
+    traffic_percentage DOUBLE NOT NULL,
+    target_environment VARCHAR(32) NOT NULL,
+    deployer_user_id VARCHAR(128) NOT NULL,
+    deploy_reason VARCHAR(256) NOT NULL DEFAULT "",
+    status VARCHAR(32) NOT NULL,
+    created_at DATETIME NOT NULL
+)
+DUPLICATE KEY(`date`, deployment_id)
+PARTITION BY RANGE(`date`) ()
+DISTRIBUTED BY HASH(deployment_id) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "MONTH",
+    "dynamic_partition.start" = "-12",
+    "dynamic_partition.end" = "3",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "4",
+    "dynamic_partition.create_history_partition" = "true"
+);
+
 CREATE TABLE IF NOT EXISTS ai_observability.dim_model_df
 (
     model_name VARCHAR(256) NOT NULL,
@@ -500,6 +531,23 @@ CREATE TABLE IF NOT EXISTS ai_observability.dim_prompt_version_df
 )
 UNIQUE KEY(prompt_id, prompt_version)
 DISTRIBUTED BY HASH(prompt_id, prompt_version) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1",
+    "enable_unique_key_merge_on_write" = "true"
+);
+
+CREATE TABLE IF NOT EXISTS ai_observability.dim_model_version_df
+(
+    model_name VARCHAR(256) NOT NULL,
+    model_version VARCHAR(128) NOT NULL,
+    provider VARCHAR(128) NOT NULL,
+    deployment_status VARCHAR(64) NOT NULL,
+    first_deployed_at DATETIME NOT NULL,
+    last_deployed_at DATETIME NOT NULL,
+    is_current_prod BOOLEAN NOT NULL
+)
+UNIQUE KEY(model_name, model_version)
+DISTRIBUTED BY HASH(model_name, model_version) BUCKETS 4
 PROPERTIES (
     "replication_num" = "1",
     "enable_unique_key_merge_on_write" = "true"

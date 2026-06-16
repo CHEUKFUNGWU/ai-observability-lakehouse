@@ -52,7 +52,8 @@ for topic in \
   ods_ai_observability_retrieval_events_di \
   ods_ai_observability_feedback_events_di \
   ods_ai_observability_guardrail_events_di \
-  ods_ai_observability_evaluation_events_di
+  ods_ai_observability_evaluation_events_di \
+  ods_ai_observability_model_deployment_events_di
 do
   if grep -qx "${topic}" <<<"${topics}"; then
     pass "Kafka topic ${topic} exists"
@@ -91,6 +92,7 @@ expected = {
     "insert-into_paimon_lake.dwd.dwd_ai_feedback_action_di": False,
     "insert-into_paimon_lake.dwd.dwd_ai_guardrail_check_di": False,
     "insert-into_paimon_lake.dwd.dwd_ai_evaluation_judgment_di": False,
+    "insert-into_paimon_lake.dwd.dwd_ai_model_deployment_di": False,
     "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1d": False,
     "insert-into_paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d": False,
     "insert-into_paimon_lake.dws.dws_ai_feedback_feature_action_1d": False,

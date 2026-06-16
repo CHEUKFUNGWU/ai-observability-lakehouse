@@ -162,3 +162,21 @@ CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_evaluation_judgment_di (
 ) WITH (
     'bucket' = '4'
 );
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_model_deployment_di (
+    deployment_id STRING,
+    model_name STRING,
+    model_version STRING,
+    provider STRING,
+    deployment_action STRING,
+    traffic_percentage DOUBLE,
+    target_environment STRING,
+    deployer_user_id STRING,
+    deploy_reason STRING,
+    status STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (deployment_id) NOT ENFORCED
+) WITH (
+    'bucket' = '4'
+);

@@ -15,6 +15,7 @@ def test_doris_schema_defines_llm_agent_and_tool_tables():
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_feedback_action_di" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_guardrail_check_di" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_evaluation_judgment_di" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_model_deployment_di" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_feature_request_1d" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_agent_agent_run_1d" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_agent_tool_tool_call_1d" in sql
@@ -30,6 +31,7 @@ def test_doris_schema_defines_llm_agent_and_tool_tables():
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_team_df" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_user_df" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_prompt_version_df" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dim_model_version_df" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_feature_anomaly" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_sla_feature_report" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_prompt_prompt_version_metrics" in sql

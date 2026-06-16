@@ -474,5 +474,7 @@ Tier 2 starts with cost-governance tables:
 | `dws_ai_evaluation_feature_judgment_1d` | One daily row per app, feature, evaluation dimension and evaluated model | Evaluation volume, pass/fail counts, average score, p10 score and evaluation latency |
 | `dim_prompt_version_df` | One row per prompt version snapshot | Prompt metadata, owner team, release status and A/B group |
 | `dws_ai_prompt_version_request_1d` | One daily row per prompt, version and model | Request volume, success/error counts, latency, tokens, cost and joined evaluation score |
+| `dwd_ai_model_deployment_di` | One row per model deployment action | Deploy, rollback, scale and canary actions with traffic percentage and target environment |
+| `dim_model_version_df` | One row per model version snapshot | Deployment status, first/last deployed timestamps and current-prod marker |
 
-Remaining planned extensions include agent, model deployment, compliance and platform-health dimensions.
+Remaining planned extensions include agent, compliance and platform-health dimensions.

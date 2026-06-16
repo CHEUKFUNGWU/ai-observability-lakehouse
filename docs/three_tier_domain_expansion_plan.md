@@ -504,6 +504,8 @@ This table enables prompt A/B test analysis and version comparison directly.
 
 Extends existing `dim_model_df`. Adds `model_version`, `deployment_status`, `first_deployed_at`, `last_deployed_at`, `is_current_prod`.
 
+Implementation status: `dwd_ai_model_deployment_di` and `dim_model_version_df` are implemented as the fourth Tier 2 slice, including mock deployment events, Spark batch transform, dimension builder, Flink/Paimon DWD table definitions, Doris DDL and tests.
+
 ---
 
 ### 4.6 Tier 2 Granularity Expansions
