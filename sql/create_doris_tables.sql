@@ -19,6 +19,8 @@ DROP TABLE IF EXISTS ai_observability.dws_ai_cost_team_request_1d;
 DROP TABLE IF EXISTS ai_observability.dws_ai_evaluation_feature_judgment_1d;
 DROP TABLE IF EXISTS ai_observability.dws_ai_prompt_version_request_1d;
 DROP TABLE IF EXISTS ai_observability.dws_ai_llm_feature_env_request_1d;
+DROP TABLE IF EXISTS ai_observability.dws_ai_llm_region_request_1d;
+DROP TABLE IF EXISTS ai_observability.dws_ai_agent_team_run_1d;
 DROP TABLE IF EXISTS ai_observability.dim_model_df;
 DROP TABLE IF EXISTS ai_observability.dim_knowledge_base_df;
 DROP TABLE IF EXISTS ai_observability.dim_guardrail_rule_df;
@@ -813,6 +815,76 @@ CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_feature_env_request_1d
 DUPLICATE KEY(`date`, app_name, feature_name, model_name, environment)
 PARTITION BY RANGE(`date`) ()
 DISTRIBUTED BY HASH(app_name, feature_name) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "MONTH",
+    "dynamic_partition.start" = "-12",
+    "dynamic_partition.end" = "3",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "4",
+    "dynamic_partition.create_history_partition" = "true"
+);
+
+CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_region_request_1d
+(
+    `date` DATE NOT NULL,
+    region VARCHAR(64) NOT NULL,
+    environment VARCHAR(32) NOT NULL,
+    app_name VARCHAR(256) NOT NULL,
+    model_name VARCHAR(256) NOT NULL,
+    request_cnt_1d BIGINT NOT NULL,
+    success_cnt_1d BIGINT NOT NULL,
+    error_cnt_1d BIGINT NOT NULL,
+    prompt_token_cnt_1d BIGINT NOT NULL,
+    completion_token_cnt_1d BIGINT NOT NULL,
+    total_token_cnt_1d BIGINT NOT NULL,
+    estimated_cost_amt_1d DOUBLE NOT NULL,
+    avg_latency_ms DOUBLE NOT NULL,
+    max_latency_ms BIGINT NOT NULL,
+    p95_latency_ms BIGINT NOT NULL
+)
+DUPLICATE KEY(`date`, region, environment, app_name, model_name)
+PARTITION BY RANGE(`date`) ()
+DISTRIBUTED BY HASH(region, app_name) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "MONTH",
+    "dynamic_partition.start" = "-12",
+    "dynamic_partition.end" = "3",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "4",
+    "dynamic_partition.create_history_partition" = "true"
+);
+
+CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_agent_team_run_1d
+(
+    `date` DATE NOT NULL,
+    team_id VARCHAR(128) NOT NULL,
+    app_name VARCHAR(256) NOT NULL,
+    agent_id VARCHAR(128) NOT NULL,
+    agent_name VARCHAR(256) NOT NULL,
+    task_type VARCHAR(128) NOT NULL,
+    run_cnt_1d BIGINT NOT NULL,
+    success_cnt_1d BIGINT NOT NULL,
+    error_cnt_1d BIGINT NOT NULL,
+    turn_cnt_1d BIGINT NOT NULL,
+    llm_call_cnt_1d BIGINT NOT NULL,
+    tool_call_cnt_1d BIGINT NOT NULL,
+    retrieval_cnt_1d BIGINT NOT NULL,
+    total_token_cnt_1d BIGINT NOT NULL,
+    estimated_cost_amt_1d DOUBLE NOT NULL,
+    avg_duration_ms DOUBLE NOT NULL,
+    p95_duration_ms BIGINT NOT NULL,
+    span_cnt_1d BIGINT NOT NULL,
+    failed_span_cnt_1d BIGINT NOT NULL,
+    tool_span_cnt_1d BIGINT NOT NULL,
+    llm_span_cnt_1d BIGINT NOT NULL
+)
+DUPLICATE KEY(`date`, team_id, app_name, agent_id, agent_name, task_type)
+PARTITION BY RANGE(`date`) ()
+DISTRIBUTED BY HASH(team_id, agent_id) BUCKETS 4
 PROPERTIES (
     "replication_num" = "1",
     "dynamic_partition.enable" = "true",

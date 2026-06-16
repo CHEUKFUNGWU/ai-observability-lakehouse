@@ -146,3 +146,51 @@ CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_llm_feature_env_request_1d (
 ) PARTITIONED BY (`date`) WITH (
     'bucket' = '4'
 );
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_llm_region_request_1d (
+    `date` DATE,
+    region STRING,
+    environment STRING,
+    app_name STRING,
+    model_name STRING,
+    request_cnt_1d BIGINT,
+    success_cnt_1d BIGINT,
+    error_cnt_1d BIGINT,
+    prompt_token_cnt_1d BIGINT,
+    completion_token_cnt_1d BIGINT,
+    total_token_cnt_1d BIGINT,
+    estimated_cost_amt_1d DOUBLE,
+    avg_latency_ms DOUBLE,
+    max_latency_ms BIGINT,
+    p95_latency_ms BIGINT,
+    PRIMARY KEY (`date`, region, environment, app_name, model_name) NOT ENFORCED
+) PARTITIONED BY (`date`) WITH (
+    'bucket' = '4'
+);
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_agent_team_run_1d (
+    `date` DATE,
+    team_id STRING,
+    app_name STRING,
+    agent_id STRING,
+    agent_name STRING,
+    task_type STRING,
+    run_cnt_1d BIGINT,
+    success_cnt_1d BIGINT,
+    error_cnt_1d BIGINT,
+    turn_cnt_1d BIGINT,
+    llm_call_cnt_1d BIGINT,
+    tool_call_cnt_1d BIGINT,
+    retrieval_cnt_1d BIGINT,
+    total_token_cnt_1d BIGINT,
+    estimated_cost_amt_1d DOUBLE,
+    avg_duration_ms DOUBLE,
+    p95_duration_ms BIGINT,
+    span_cnt_1d BIGINT,
+    failed_span_cnt_1d BIGINT,
+    tool_span_cnt_1d BIGINT,
+    llm_span_cnt_1d BIGINT,
+    PRIMARY KEY (`date`, team_id, app_name, agent_id, agent_name, task_type) NOT ENFORCED
+) PARTITIONED BY (`date`) WITH (
+    'bucket' = '4'
+);

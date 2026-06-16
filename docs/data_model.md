@@ -477,5 +477,7 @@ Tier 2 starts with cost-governance tables:
 | `dwd_ai_model_deployment_di` | One row per model deployment action | Deploy, rollback, scale and canary actions with traffic percentage and target environment |
 | `dim_model_version_df` | One row per model version snapshot | Deployment status, first/last deployed timestamps and current-prod marker |
 | `dws_ai_llm_feature_env_request_1d` | One daily row per app, feature, model and environment | Prod/staging/dev split of request volume, success/error counts, tokens, cost and latency |
+| `dws_ai_llm_region_request_1d` | One daily row per region, environment, app and model | Regional request volume, success/error counts, tokens, cost and latency |
+| `dws_ai_agent_team_run_1d` | One daily row per team, app, agent and task type | Team-attributed agent run volume, success/error counts, tokens, cost, duration and span metrics |
 
 Remaining planned extensions include agent, compliance and platform-health dimensions.

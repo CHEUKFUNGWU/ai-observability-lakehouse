@@ -109,3 +109,23 @@ SELECT
     CAST(MAX(latency_ms) AS BIGINT) AS p95_latency_ms
 FROM paimon_lake.dwd.dwd_ai_llm_request_di
 GROUP BY `date`, app_name, feature_name, model_name, environment;
+
+INSERT INTO paimon_lake.dws.dws_ai_llm_region_request_1d
+SELECT
+    `date`,
+    region,
+    environment,
+    app_name,
+    model_name,
+    COUNT(*) AS request_cnt_1d,
+    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_cnt_1d,
+    SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_cnt_1d,
+    SUM(prompt_tokens) AS prompt_token_cnt_1d,
+    SUM(completion_tokens) AS completion_token_cnt_1d,
+    SUM(total_tokens) AS total_token_cnt_1d,
+    SUM(estimated_cost_usd) AS estimated_cost_amt_1d,
+    AVG(latency_ms) AS avg_latency_ms,
+    CAST(MAX(latency_ms) AS BIGINT) AS max_latency_ms,
+    CAST(MAX(latency_ms) AS BIGINT) AS p95_latency_ms
+FROM paimon_lake.dwd.dwd_ai_llm_request_di
+GROUP BY `date`, region, environment, app_name, model_name;

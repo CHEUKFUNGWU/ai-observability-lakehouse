@@ -516,9 +516,10 @@ With team and user dimensions in place, existing DWS tables gain new grouping ke
 |---|---|---|
 | `dws_ai_llm_feature_request_1d` | + `team_id` | `dws_ai_cost_team_request_1d` (see 4.2) |
 | `dws_ai_llm_feature_request_1d` | + `environment` | `dws_ai_llm_feature_env_request_1d` |
+| `dws_ai_llm_feature_request_1d` | + `region`, `environment` | `dws_ai_llm_region_request_1d` |
 | `dws_ai_agent_agent_run_1d` | + `team_id` | `dws_ai_agent_team_run_1d` |
 
-Implementation status: `dws_ai_llm_feature_env_request_1d` is implemented as the first Tier 2 granularity expansion. It reuses `dwd_ai_llm_request_di` and groups by date, app, feature, model, and environment for prod/staging/dev comparisons.
+Implementation status: Tier 2 granularity expansions are implemented. `dws_ai_cost_team_request_1d` and `dws_ai_agent_team_run_1d` use `dim_user_df` to attribute LLM requests and Agent runs to teams. `dws_ai_llm_feature_env_request_1d` and `dws_ai_llm_region_request_1d` reuse `dwd_ai_llm_request_di` for environment and region comparison.
 
 ---
 
@@ -675,6 +676,8 @@ Built from: `dwd_ai_llm_request_di` grouped by `session_id`, then aggregated to 
 Both `region` and `environment` fields exist in all DWD tables but are not DWS grouping keys.
 
 Addition: a `dws_ai_llm_region_request_1d` table with `region` and `environment` as grouping keys, enabling multi-region comparison and prod-vs-staging analysis.
+
+Implementation: `dws_ai_llm_feature_env_request_1d` and `dws_ai_llm_region_request_1d` are implemented for LLM environment and regional analysis. `dws_ai_agent_team_run_1d` is implemented for team-level Agent run accountability.
 
 ---
 

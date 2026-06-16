@@ -40,3 +40,13 @@ SELECT
     COUNT(*) AS dws_llm_feature_env_metric_rows,
     SUM(request_cnt_1d) AS total_feature_env_request_cnt_1d
 FROM paimon_lake.dws.dws_ai_llm_feature_env_request_1d;
+
+SELECT
+    COUNT(*) AS dws_llm_region_metric_rows,
+    SUM(request_cnt_1d) AS total_region_request_cnt_1d
+FROM paimon_lake.dws.dws_ai_llm_region_request_1d;
+
+SELECT
+    COUNT(*) AS dws_agent_team_metric_rows,
+    SUM(run_cnt_1d) AS total_team_run_cnt_1d
+FROM paimon_lake.dws.dws_ai_agent_team_run_1d;
