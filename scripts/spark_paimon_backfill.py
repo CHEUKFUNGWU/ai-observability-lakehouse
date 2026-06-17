@@ -16,11 +16,11 @@ from scripts.spark_utils import build_paimon_spark_session
 
 DEFAULT_START_TIME = "2026-01-01T00:00:00+00:00"
 DEFAULT_INPUT_PATH = Path("data/raw/mock_llm_requests/events.jsonl")
-DEFAULT_QUARANTINE_PATH = Path("data/warehouse/quarantine/llm_request/events.parquet")
+DEFAULT_QUARANTINE_PATH = Path("data/warehouse/quarantine/dwd_ai_llm_request_di/events.parquet")
 LOGGER = get_logger(__name__)
 
-DWD_TABLE = "paimon_lake.dwd.llm_request_events"
-DWS_TABLE = "paimon_lake.dws.llm_feature_daily_metrics"
+DWD_TABLE = "paimon_lake.dwd.dwd_ai_llm_request_di"
+DWS_TABLE = "paimon_lake.dws.dws_ai_llm_feature_request_1d"
 DWD_PRIMARY_KEY = "request_id"
 DWS_PRIMARY_KEY = "date,app_name,feature_name,model_name"
 DWD_DYNAMIC_BUCKETS = "-1"
@@ -59,7 +59,7 @@ def ensure_paimon_tables(spark: SparkSession) -> None:
     spark.sql("CREATE DATABASE IF NOT EXISTS paimon_lake.dws")
     spark.sql(
         """
-        CREATE TABLE IF NOT EXISTS paimon_lake.dwd.llm_request_events (
+        CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_llm_request_di (
             request_id STRING,
             trace_id STRING,
             run_id STRING,
@@ -110,7 +110,7 @@ def ensure_paimon_tables(spark: SparkSession) -> None:
     )
     spark.sql(
         """
-        CREATE TABLE IF NOT EXISTS paimon_lake.dws.llm_feature_daily_metrics (
+        CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_llm_feature_request_1d (
             app_name STRING,
             feature_name STRING,
             model_name STRING,

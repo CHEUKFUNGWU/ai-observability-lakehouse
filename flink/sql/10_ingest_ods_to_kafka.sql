@@ -1,6 +1,6 @@
 -- Stream CDC changes into Kafka ODS.
 
-INSERT INTO kafka_ods_llm_request_events
+INSERT INTO ods_ai_observability_llm_request_events_di
 SELECT
     request_id,
     trace_id,

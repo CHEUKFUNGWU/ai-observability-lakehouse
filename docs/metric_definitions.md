@@ -10,7 +10,7 @@ Total number of LLM requests.
 
 ```sql
 SELECT count(*) AS total_requests
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 ```
 
 ---
@@ -26,7 +26,7 @@ Percentage of requests with `status = 'success'`.
 ```sql
 SELECT
     SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / count(*) AS success_rate
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 ```
 
 ---
@@ -42,7 +42,7 @@ Percentage of requests with `status = 'error'`.
 ```sql
 SELECT
     SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) / count(*) AS error_rate
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 ```
 
 ---
@@ -58,7 +58,7 @@ Total input and output tokens consumed by LLM requests.
 ```sql
 SELECT
     sum(total_tokens) AS total_tokens
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 ```
 
 ---
@@ -74,7 +74,7 @@ Total input tokens.
 ```sql
 SELECT
     sum(prompt_tokens) AS prompt_tokens
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 ```
 
 ---
@@ -90,7 +90,7 @@ Total output tokens.
 ```sql
 SELECT
     sum(completion_tokens) AS completion_tokens
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 ```
 
 ---
@@ -115,7 +115,7 @@ completion_tokens / 1,000,000 * output_price_per_1m_tokens
 ```sql
 SELECT
     sum(estimated_cost_usd) AS total_estimated_cost_usd
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 ```
 
 ---
@@ -131,7 +131,7 @@ Average request latency in milliseconds.
 ```sql
 SELECT
     avg(latency_ms) AS avg_latency_ms
-FROM ai_observability.dwd_llm_request_events
+FROM ai_observability.dwd_ai_llm_request_di
 WHERE status = 'success';
 ```
 
@@ -151,7 +151,7 @@ The local Flink DWS layer stores `max_latency_ms` plus a placeholder `p95_latenc
 ```sql
 SELECT
     PERCENTILE_APPROX(latency_ms, 0.95) AS p95_latency_ms
-FROM ai_observability.dwd_llm_request_events
+FROM ai_observability.dwd_ai_llm_request_di
 WHERE status = 'success';
 ```
 
@@ -169,7 +169,7 @@ Estimated cost grouped by model.
 SELECT
     model_name,
     sum(estimated_cost_usd) AS total_cost_usd
-FROM ai_observability.dwd_llm_request_events
+FROM ai_observability.dwd_ai_llm_request_di
 GROUP BY model_name
 ORDER BY total_cost_usd DESC;
 ```
@@ -190,7 +190,7 @@ SELECT
     SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_count,
     count(*) AS total_count,
     SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) / count(*) AS error_rate
-FROM ai_observability.dwd_llm_request_events
+FROM ai_observability.dwd_ai_llm_request_di
 GROUP BY model_name
 ORDER BY error_rate DESC;
 ```
@@ -211,7 +211,7 @@ SELECT
     sum(prompt_tokens) AS input_tokens,
     sum(completion_tokens) AS output_tokens,
     sum(total_tokens) AS total_tokens
-FROM ai_observability.dwd_llm_request_events
+FROM ai_observability.dwd_ai_llm_request_di
 GROUP BY feature_name
 ORDER BY total_tokens DESC;
 ```
@@ -232,7 +232,7 @@ SELECT
     sum(error_count) AS failed_calls,
     sum(tool_call_count) AS total_calls,
     sum(error_count) / sum(tool_call_count) AS failure_rate
-FROM ai_observability.dws_agent_tool_daily_metrics
+FROM ai_observability.dws_ai_agent_tool_tool_call_1d
 GROUP BY tool_name
 ORDER BY failure_rate DESC;
 ```

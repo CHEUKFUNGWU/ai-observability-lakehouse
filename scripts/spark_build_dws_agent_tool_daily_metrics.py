@@ -8,8 +8,8 @@ from app.logging_utils import get_logger, log_info
 from scripts.spark_utils import build_spark_session
 
 
-DEFAULT_INPUT_PATH = Path("data/warehouse/agent_tool_call/events.parquet")
-DEFAULT_OUTPUT_PATH = Path("data/warehouse/dws/agent_tool_daily_metrics.parquet")
+DEFAULT_INPUT_PATH = Path("data/warehouse/dwd/dwd_ai_agent_tool_call_di/events.parquet")
+DEFAULT_OUTPUT_PATH = Path("data/warehouse/dws/dws_ai_agent_tool_tool_call_1d.parquet")
 LOGGER = get_logger(__name__)
 
 

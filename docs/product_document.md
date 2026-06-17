@@ -87,26 +87,26 @@ Tool dashboard metrics:
 
 Implemented DWD facts:
 
-- `llm_request_events`
-- `agent_run_events`
-- `agent_span_events`
-- `agent_tool_call_events`
+- `dwd_ai_llm_request_di`
+- `dwd_ai_agent_run_di`
+- `dwd_ai_agent_span_di`
+- `dwd_ai_agent_tool_call_di`
 
 Implemented DWS metrics:
 
-- `llm_feature_daily_metrics`
-- `agent_daily_metrics`
-- `agent_tool_daily_metrics`
+- `dws_ai_llm_feature_request_1d`
+- `dws_ai_agent_agent_run_1d`
+- `dws_ai_agent_tool_tool_call_1d`
 
 Implemented Doris serving tables:
 
-- `dwd_llm_request_events`
-- `dwd_agent_run_events`
-- `dwd_agent_span_events`
-- `dwd_agent_tool_call_events`
-- `dws_llm_feature_daily_metrics`
-- `dws_agent_daily_metrics`
-- `dws_agent_tool_daily_metrics`
+- `dwd_ai_llm_request_di`
+- `dwd_ai_agent_run_di`
+- `dwd_ai_agent_span_di`
+- `dwd_ai_agent_tool_call_di`
+- `dws_ai_llm_feature_request_1d`
+- `dws_ai_agent_agent_run_1d`
+- `dws_ai_agent_tool_tool_call_1d`
 
 ## 7. Product Value
 
@@ -129,10 +129,11 @@ For product and operations teams:
 
 ## 8. Explicit Non-Scope For Current MVP
 
-The following are planned extensions, not implemented core tables:
+Tier 1 domain expansion now covers dedicated RAG retrieval, user feedback and guardrail facts with DWS/ADS serving tables. The following remain planned extensions:
 
-- Dedicated RAG retrieval fact table
 - Prompt/version dimension table
 - Agent dimension table
+- Team/user organization dimensions
+- Evaluation and model deployment facts
 - Config-driven pricing table
 - Production Superset/Grafana dashboard bundle

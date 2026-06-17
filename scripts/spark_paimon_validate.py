@@ -6,7 +6,7 @@ from scripts.spark_utils import build_paimon_spark_session
 
 
 LOGGER = get_logger(__name__)
-DEFAULT_INPUT_TABLE = "paimon_lake.dwd.llm_request_events"
+DEFAULT_INPUT_TABLE = "paimon_lake.dwd.dwd_ai_llm_request_di"
 
 
 def main() -> None:

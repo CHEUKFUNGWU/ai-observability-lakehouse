@@ -9,9 +9,9 @@ from app.logging_utils import get_logger, log_info
 from scripts.spark_utils import build_spark_session
 
 
-DEFAULT_RUN_INPUT_PATH = Path("data/warehouse/agent_run/events.parquet")
-DEFAULT_SPAN_INPUT_PATH = Path("data/warehouse/agent_span/events.parquet")
-DEFAULT_OUTPUT_PATH = Path("data/warehouse/dws/agent_daily_metrics.parquet")
+DEFAULT_RUN_INPUT_PATH = Path("data/warehouse/dwd/dwd_ai_agent_run_di/events.parquet")
+DEFAULT_SPAN_INPUT_PATH = Path("data/warehouse/dwd/dwd_ai_agent_span_di/events.parquet")
+DEFAULT_OUTPUT_PATH = Path("data/warehouse/dws/dws_ai_agent_agent_run_1d.parquet")
 LOGGER = get_logger(__name__)
 
 

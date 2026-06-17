@@ -7,8 +7,8 @@ from app.logging_utils import get_logger, log_info
 from app.pipeline_metadata import append_pipeline_run
 from scripts.spark_utils import build_paimon_spark_session
 
-DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/prompt_version_daily_metrics.parquet")
-DEFAULT_INPUT_TABLE = "paimon_lake.dwd.llm_request_events"
+DEFAULT_OUTPUT_PATH = Path("data/warehouse/ads/ads_observability_prompt_prompt_version_metrics.parquet")
+DEFAULT_INPUT_TABLE = "paimon_lake.dwd.dwd_ai_llm_request_di"
 LOGGER = get_logger(__name__)
 
 

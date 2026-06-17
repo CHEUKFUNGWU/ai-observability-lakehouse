@@ -1,4 +1,4 @@
--- Dashboard queries for ai_observability.dws_llm_feature_daily_metrics.
+-- Dashboard queries for ai_observability.dws_ai_llm_feature_request_1d.
 -- These queries are designed for Doris and the DWS feature daily table.
 
 -- 1. Daily traffic, reliability, token usage and cost.
@@ -20,7 +20,7 @@ FROM
         SUM(error_count) AS error_count,
         SUM(total_tokens) AS total_tokens,
         ROUND(SUM(estimated_cost_usd), 8) AS estimated_cost_usd
-    FROM ai_observability.dws_llm_feature_daily_metrics
+    FROM ai_observability.dws_ai_llm_feature_request_1d
     GROUP BY `date`
 ) daily
 ORDER BY `date`;
@@ -29,7 +29,7 @@ ORDER BY `date`;
 SELECT
     feature_name,
     SUM(request_count) AS request_count
-FROM ai_observability.dws_llm_feature_daily_metrics
+FROM ai_observability.dws_ai_llm_feature_request_1d
 GROUP BY feature_name
 ORDER BY request_count DESC;
 
@@ -37,7 +37,7 @@ ORDER BY request_count DESC;
 SELECT
     feature_name,
     ROUND(SUM(estimated_cost_usd), 8) AS estimated_cost_usd
-FROM ai_observability.dws_llm_feature_daily_metrics
+FROM ai_observability.dws_ai_llm_feature_request_1d
 GROUP BY feature_name
 ORDER BY estimated_cost_usd DESC;
 
@@ -56,7 +56,7 @@ FROM
         SUM(request_count) AS request_count,
         SUM(success_count) AS success_count,
         SUM(error_count) AS error_count
-    FROM ai_observability.dws_llm_feature_daily_metrics
+    FROM ai_observability.dws_ai_llm_feature_request_1d
     GROUP BY feature_name
 ) feature_rollup
 ORDER BY error_rate DESC, request_count DESC;
@@ -65,7 +65,7 @@ ORDER BY error_rate DESC, request_count DESC;
 SELECT
     feature_name,
     ROUND(SUM(avg_latency_ms * request_count) / NULLIF(SUM(request_count), 0), 2) AS weighted_avg_latency_ms
-FROM ai_observability.dws_llm_feature_daily_metrics
+FROM ai_observability.dws_ai_llm_feature_request_1d
 GROUP BY feature_name
 ORDER BY weighted_avg_latency_ms DESC;
 
@@ -83,7 +83,7 @@ FROM
         SUM(request_count) AS request_count,
         SUM(total_tokens) AS total_tokens,
         ROUND(SUM(estimated_cost_usd), 8) AS estimated_cost_usd
-    FROM ai_observability.dws_llm_feature_daily_metrics
+    FROM ai_observability.dws_ai_llm_feature_request_1d
     GROUP BY model_name
 ) model_rollup
 ORDER BY estimated_cost_usd DESC;
@@ -105,7 +105,7 @@ FROM
         SUM(error_count) AS error_count_sum,
         ROUND(SUM(estimated_cost_usd), 8) AS estimated_cost_usd,
         ROUND(SUM(avg_latency_ms * request_count) / NULLIF(SUM(request_count), 0), 2) AS weighted_avg_latency_ms
-    FROM ai_observability.dws_llm_feature_daily_metrics
+    FROM ai_observability.dws_ai_llm_feature_request_1d
     GROUP BY app_name, feature_name
 ) leaderboard
 ORDER BY request_count_sum DESC;
@@ -126,8 +126,8 @@ FROM
         SUM(request_count) AS request_count,
         SUM(total_tokens) AS total_tokens,
         SUM(estimated_cost_usd) AS estimated_cost_usd
-    FROM ai_observability.dws_llm_feature_daily_metrics
+    FROM ai_observability.dws_ai_llm_feature_request_1d
     GROUP BY model_name
 ) a
-JOIN ai_observability.dim_model m ON a.model_name = m.model_name
+JOIN ai_observability.dim_model_df m ON a.model_name = m.model_name
 ORDER BY estimated_cost_usd DESC;

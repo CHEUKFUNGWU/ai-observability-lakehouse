@@ -18,17 +18,17 @@ This plan eliminates all redundant pipelines and makes Paimon the single source 
 
 | Current Name | New Name |
 |---|---|
-| `ads_llm_feature_daily_metrics` | `dws_llm_feature_daily_metrics` |
-| `ads_agent_daily_metrics` | `dws_agent_daily_metrics` |
-| `ads_agent_tool_daily_metrics` | `dws_agent_tool_daily_metrics` |
+| `ads_llm_feature_daily_metrics` | `dws_ai_llm_feature_request_1d` |
+| `ads_agent_daily_metrics` | `dws_ai_agent_agent_run_1d` |
+| `ads_agent_tool_daily_metrics` | `dws_ai_agent_tool_tool_call_1d` |
 
-These stay as ADS (application-specific): `ads_cost_anomaly_daily`, `ads_sla_daily_report`, `ads_prompt_version_daily_metrics`, `mv_daily_summary`.
+These stay as ADS (application-specific): `ads_observability_cost_feature_anomaly`, `ads_observability_sla_feature_report`, `ads_observability_prompt_prompt_version_metrics`, `mv_daily_summary`.
 
 ### Files to Modify
 
 **Flink SQL (rename + update references):**
 - `flink/sql/00_catalogs.sql` — add `CREATE DATABASE IF NOT EXISTS paimon_lake.dws;`
-- `flink/sql/04_ads_paimon_tables.sql` → rename to `04_dws_paimon_tables.sql`, change table to `paimon_lake.dws.llm_feature_daily_metrics`
+- `flink/sql/04_ads_paimon_tables.sql` → rename to `04_dws_paimon_tables.sql`, change table to `paimon_lake.dws.dws_ai_llm_feature_request_1d`
 - `flink/sql/30_build_ads_from_dwd.sql` → rename to `30_build_dws_from_dwd.sql`, update INSERT INTO target
 - `flink/sql/92_verify_ads_metrics.sql` → rename to `92_verify_dws_metrics.sql`, update FROM target
 
@@ -43,7 +43,7 @@ These stay as ADS (application-specific): `ads_cost_anomaly_daily`, `ads_sla_dai
 
 **Doris:**
 - `sql/create_doris_tables.sql` — rename three tables, update MV reference
-- `sql/doris_dashboard_queries.sql` — replace `ads_llm_feature_daily_metrics` → `dws_llm_feature_daily_metrics` (8 queries)
+- `sql/doris_dashboard_queries.sql` — replace `ads_llm_feature_daily_metrics` → `dws_ai_llm_feature_request_1d` (8 queries)
 - `scripts/load_ads_metrics_to_doris.py` → rename to `load_dws_metrics_to_doris.py`, update DEFAULT_TABLE_NAME
 
 **Demo/Makefile:**
@@ -103,7 +103,7 @@ These stay as ADS (application-specific): `ads_cost_anomaly_daily`, `ads_sla_dai
 - `flink/sql/04_dws_paimon_tables.sql` (renamed in Phase 1) — add `p95_latency_ms BIGINT` column
 - `flink/sql/30_build_dws_from_dwd.sql` (renamed in Phase 1) — add `CAST(0 AS BIGINT) AS p95_latency_ms`
 - `scripts/spark_build_dws_llm_feature_daily_metrics.py` (renamed in Phase 1) — add `MAX(latency_ms)` as `max_latency_ms`
-- `sql/create_doris_tables.sql` — add `max_latency_ms` column to `dws_llm_feature_daily_metrics`
+- `sql/create_doris_tables.sql` — add `max_latency_ms` column to `dws_ai_llm_feature_request_1d`
 - `scripts/load_dws_metrics_to_doris.py` (renamed in Phase 1) — add `max_latency_ms` to LOAD_COLUMNS
 - Tests: update latency assertions in DWS and Doris schema tests
 - Update `docs/adr/004-flink-ads-p95-max-proxy.md` — reference DWS naming, document unified schema
@@ -152,9 +152,9 @@ Keep the existing `build_spark_session()` unchanged — tests and mock generator
 1. Reads JSONL source (or Parquet ODS)
 2. Applies `transform_llm_events()` (reuses existing function)
 3. Applies `validate_llm_events()` + `split_valid_quarantine()` (reuses existing DQ)
-4. Writes valid events to `paimon_lake.dwd.llm_request_events`
+4. Writes valid events to `paimon_lake.dwd.dwd_ai_llm_request_di`
 5. Computes DWS metrics via `build_feature_daily_metrics()` (reuses existing function)
-6. Writes to `paimon_lake.dws.llm_feature_daily_metrics`
+6. Writes to `paimon_lake.dws.dws_ai_llm_feature_request_1d`
 - Accepts `--start-date`, `--end-date` for targeted backfill
 
 **Create `scripts/spark_paimon_validate.py`** — reads Paimon DWD, runs DQ checks, reports statistics.
@@ -192,9 +192,9 @@ CREATE CATALOG IF NOT EXISTS paimon_lake PROPERTIES (
 - Create `sql/doris_sync_paimon_dws.sql`:
 
 ```sql
-TRUNCATE TABLE ai_observability.dws_llm_feature_daily_metrics;
-INSERT INTO ai_observability.dws_llm_feature_daily_metrics
-SELECT * FROM paimon_lake.dws.llm_feature_daily_metrics;
+TRUNCATE TABLE ai_observability.dws_ai_llm_feature_request_1d;
+INSERT INTO ai_observability.dws_ai_llm_feature_request_1d
+SELECT * FROM paimon_lake.dws.dws_ai_llm_feature_request_1d;
 ```
 
 - `scripts/run_full_demo.sh` — add catalog creation and sync steps
@@ -245,9 +245,9 @@ These files keep their pure transform functions but lose their standalone `main(
 
 ### Update (true ADS scripts read from Paimon)
 
-- `scripts/spark_build_ads_cost_anomaly.py` — use `build_paimon_spark_session`, read from `paimon_lake.dws.llm_feature_daily_metrics`
+- `scripts/spark_build_ads_cost_anomaly.py` — use `build_paimon_spark_session`, read from `paimon_lake.dws.dws_ai_llm_feature_request_1d`
 - `scripts/spark_build_ads_sla_daily.py` — same
-- `scripts/spark_build_ads_prompt_version_metrics.py` — read from `paimon_lake.dwd.llm_request_events`
+- `scripts/spark_build_ads_prompt_version_metrics.py` — read from `paimon_lake.dwd.dwd_ai_llm_request_di`
 - `scripts/spark_build_dim_model.py` — optionally write to Paimon dim table
 
 ### Update demo/Makefile

@@ -28,7 +28,7 @@ def test_paimon_catalog_backfill_round_trip(paimon_spark, tmp_path):
 
     assert result["dwd_rows"] == 2
     assert result["quarantine_rows"] == 0
-    assert paimon_spark.table("paimon_lake.dwd.llm_request_events").count() == 2
-    metrics = paimon_spark.table("paimon_lake.dws.llm_feature_daily_metrics").collect()
+    assert paimon_spark.table("paimon_lake.dwd.dwd_ai_llm_request_di").count() == 2
+    metrics = paimon_spark.table("paimon_lake.dws.dws_ai_llm_feature_request_1d").collect()
     assert len(metrics) == 1
     assert metrics[0]["max_latency_ms"] == 200

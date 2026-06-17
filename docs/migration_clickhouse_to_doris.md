@@ -213,8 +213,8 @@ echo "Doris BE registration attempted."
 CREATE DATABASE IF NOT EXISTS ai_observability;
 
 -- DWD: LLM Request Events
-DROP TABLE IF EXISTS ai_observability.dwd_llm_request_events;
-CREATE TABLE IF NOT EXISTS ai_observability.dwd_llm_request_events
+DROP TABLE IF EXISTS ai_observability.dwd_ai_llm_request_di;
+CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_llm_request_di
 (
     `date`               DATE           NOT NULL,
     request_id           VARCHAR(128)   NOT NULL,
@@ -271,8 +271,8 @@ PROPERTIES (
 );
 
 -- DWD: Agent Run Events
-DROP TABLE IF EXISTS ai_observability.dwd_agent_run_events;
-CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_run_events
+DROP TABLE IF EXISTS ai_observability.dwd_ai_agent_run_di;
+CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_agent_run_di
 (
     `date`               DATE           NOT NULL,
     run_id               VARCHAR(128)   NOT NULL,
@@ -319,8 +319,8 @@ PROPERTIES (
 );
 
 -- DWD: Agent Span Events
-DROP TABLE IF EXISTS ai_observability.dwd_agent_span_events;
-CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_span_events
+DROP TABLE IF EXISTS ai_observability.dwd_ai_agent_span_di;
+CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_agent_span_di
 (
     `date`               DATE           NOT NULL,
     span_id              VARCHAR(128)   NOT NULL,
@@ -360,8 +360,8 @@ PROPERTIES (
 );
 
 -- DWD: Agent Tool Call Events
-DROP TABLE IF EXISTS ai_observability.dwd_agent_tool_call_events;
-CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_tool_call_events
+DROP TABLE IF EXISTS ai_observability.dwd_ai_agent_tool_call_di;
+CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_agent_tool_call_di
 (
     `date`               DATE           NOT NULL,
     tool_call_id         VARCHAR(128)   NOT NULL,
@@ -397,8 +397,8 @@ PROPERTIES (
 );
 
 -- ADS: LLM Feature Daily Metrics
-DROP TABLE IF EXISTS ai_observability.dws_llm_feature_daily_metrics;
-CREATE TABLE IF NOT EXISTS ai_observability.dws_llm_feature_daily_metrics
+DROP TABLE IF EXISTS ai_observability.dws_ai_llm_feature_request_1d;
+CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_feature_request_1d
 (
     `date`               DATE           NOT NULL,
     app_name             VARCHAR(256)   NOT NULL,
@@ -428,8 +428,8 @@ PROPERTIES (
 );
 
 -- ADS: Agent Daily Metrics
-DROP TABLE IF EXISTS ai_observability.dws_agent_daily_metrics;
-CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_daily_metrics
+DROP TABLE IF EXISTS ai_observability.dws_ai_agent_agent_run_1d;
+CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_agent_agent_run_1d
 (
     `date`               DATE           NOT NULL,
     app_name             VARCHAR(256)   NOT NULL,
@@ -466,8 +466,8 @@ PROPERTIES (
 );
 
 -- ADS: Agent Tool Daily Metrics
-DROP TABLE IF EXISTS ai_observability.dws_agent_tool_daily_metrics;
-CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_tool_daily_metrics
+DROP TABLE IF EXISTS ai_observability.dws_ai_agent_tool_tool_call_1d;
+CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_agent_tool_tool_call_1d
 (
     `date`               DATE           NOT NULL,
     agent_id             VARCHAR(128)   NOT NULL,
@@ -538,24 +538,24 @@ Replace ClickHouse-specific syntax:
 ```sql
 -- ClickHouse (before)
 SELECT quantile(0.95)(latency_ms) AS p95_latency_ms
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 
 -- Doris (after)
 SELECT PERCENTILE_APPROX(latency_ms, 0.95) AS p95_latency_ms
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 ```
 
 ```sql
 -- ClickHouse (before)
 SELECT countIf(status = 'success') / count(*) AS success_rate
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 
 -- Doris (after)
 SELECT SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*) AS success_rate
-FROM ai_observability.dwd_llm_request_events;
+FROM ai_observability.dwd_ai_llm_request_di;
 ```
 
-Replace all `llm_request_events_ch` references with `ai_observability.dwd_llm_request_events`.
+Replace all `llm_request_events_ch` references with `ai_observability.dwd_ai_llm_request_di`.
 
 ---
 
@@ -589,8 +589,8 @@ import pyarrow.parquet as pq
 from app.logging_utils import get_logger, log_info
 
 
-DEFAULT_INPUT_PATH = Path("data/warehouse/ads/llm_feature_daily_metrics.parquet")
-DEFAULT_TABLE_NAME = "dws_llm_feature_daily_metrics"
+DEFAULT_INPUT_PATH = Path("data/warehouse/dws/dws_ai_llm_feature_request_1d.parquet")
+DEFAULT_TABLE_NAME = "dws_ai_llm_feature_request_1d"
 DEFAULT_DATABASE = "ai_observability"
 DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 9030
@@ -727,19 +727,19 @@ from scripts.load_dws_metrics_to_doris import qualified_table_name
 
 
 def test_qualified_table_name_accepts_safe_identifiers():
-    assert qualified_table_name("ai_observability", "dws_llm_feature_daily_metrics") == (
-        "ai_observability.dws_llm_feature_daily_metrics"
+    assert qualified_table_name("ai_observability", "dws_ai_llm_feature_request_1d") == (
+        "ai_observability.dws_ai_llm_feature_request_1d"
     )
 
 
 @pytest.mark.parametrize(
     ("database", "table"),
     [
-        ("ai_observability;DROP TABLE x", "dws_llm_feature_daily_metrics"),
-        ("ai_observability", "dws_llm_feature_daily_metrics;DROP TABLE x"),
-        ("ai-observability", "dws_llm_feature_daily_metrics"),
+        ("ai_observability;DROP TABLE x", "dws_ai_llm_feature_request_1d"),
+        ("ai_observability", "dws_ai_llm_feature_request_1d;DROP TABLE x"),
+        ("ai-observability", "dws_ai_llm_feature_request_1d"),
         ("ai_observability", "ads llm feature daily metrics"),
-        ("ai_observability", "`dws_llm_feature_daily_metrics`"),
+        ("ai_observability", "`dws_ai_llm_feature_request_1d`"),
     ],
 )
 def test_qualified_table_name_rejects_unsafe_identifiers(database, table):
@@ -760,13 +760,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_doris_schema_defines_all_dwd_and_ads_tables():
     sql = (REPO_ROOT / "sql" / "create_doris_tables.sql").read_text(encoding="utf-8")
 
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_llm_request_events" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_run_events" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_span_events" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_agent_tool_call_events" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_llm_feature_daily_metrics" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_daily_metrics" in sql
-    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_agent_tool_daily_metrics" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_llm_request_di" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_agent_run_di" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_agent_span_di" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_agent_tool_call_di" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_feature_request_1d" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_agent_agent_run_1d" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_agent_tool_tool_call_1d" in sql
 
 
 def test_doris_tables_use_duplicate_key_model():
@@ -843,13 +843,13 @@ After running this, all Paimon databases and tables are queryable from Doris:
 SHOW DATABASES FROM paimon_lake;
 
 -- Query Paimon ADS directly (zero data movement)
-SELECT * FROM paimon_lake.dws.llm_feature_daily_metrics;
+SELECT * FROM paimon_lake.dws.dws_ai_llm_feature_request_1d;
 
 -- Query Paimon DWD for exact percentile computation
 SELECT
     feature_name,
     PERCENTILE_APPROX(latency_ms, 0.95) AS p95_latency_ms
-FROM paimon_lake.dwd.llm_request_events
+FROM paimon_lake.dwd.dwd_ai_llm_request_di
 WHERE `date` >= '2026-01-01'
 GROUP BY feature_name;
 ```
@@ -866,10 +866,10 @@ Catalog federation is convenient but scans Paimon files on every query. For fast
 -- Sync Paimon ADS to Doris local tables for faster dashboard queries.
 -- Run this after Flink streaming jobs have written new ADS data.
 
-TRUNCATE TABLE ai_observability.dws_llm_feature_daily_metrics;
+TRUNCATE TABLE ai_observability.dws_ai_llm_feature_request_1d;
 
-INSERT INTO ai_observability.dws_llm_feature_daily_metrics
-SELECT * FROM paimon_lake.dws.llm_feature_daily_metrics;
+INSERT INTO ai_observability.dws_ai_llm_feature_request_1d
+SELECT * FROM paimon_lake.dws.dws_ai_llm_feature_request_1d;
 ```
 
 This can be triggered manually, by cron, or from a script:
@@ -914,8 +914,8 @@ def test_doris_paimon_catalog_sql_exists():
 def test_doris_sync_paimon_ads_sql_exists():
     sql = (REPO_ROOT / "sql" / "doris_sync_paimon_ads.sql").read_text(encoding="utf-8")
 
-    assert "INSERT INTO ai_observability.dws_llm_feature_daily_metrics" in sql
-    assert "FROM paimon_lake.dws.llm_feature_daily_metrics" in sql
+    assert "INSERT INTO ai_observability.dws_ai_llm_feature_request_1d" in sql
+    assert "FROM paimon_lake.dws.dws_ai_llm_feature_request_1d" in sql
 ```
 
 ---
@@ -1028,7 +1028,7 @@ uv run python -m scripts.load_dws_metrics_to_doris
 
 # Verify row count
 mysql -h 127.0.0.1 -P 9030 -u root -e \
-  "SELECT COUNT(*) FROM ai_observability.dws_llm_feature_daily_metrics;"
+  "SELECT COUNT(*) FROM ai_observability.dws_ai_llm_feature_request_1d;"
 
 # Run dashboard queries
 mysql -h 127.0.0.1 -P 9030 -u root < sql/doris_dashboard_queries.sql

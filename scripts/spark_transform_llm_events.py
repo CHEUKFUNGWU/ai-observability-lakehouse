@@ -11,9 +11,9 @@ from app.pipeline_metadata import append_pipeline_run
 from scripts.spark_utils import build_spark_session
 
 
-DEFAULT_INPUT_PATH = Path("data/warehouse/ods/llm_request/events.parquet")
-DEFAULT_OUTPUT_PATH = Path("data/warehouse/llm_request/events.parquet")
-DEFAULT_QUARANTINE_OUTPUT_PATH = Path("data/warehouse/quarantine/llm_request/events.parquet")
+DEFAULT_INPUT_PATH = Path("data/warehouse/ods/ods_ai_observability_llm_request_events_di/events.parquet")
+DEFAULT_OUTPUT_PATH = Path("data/warehouse/dwd/dwd_ai_llm_request_di/events.parquet")
+DEFAULT_QUARANTINE_OUTPUT_PATH = Path("data/warehouse/quarantine/dwd_ai_llm_request_di/events.parquet")
 LOGGER = get_logger(__name__)
 
 

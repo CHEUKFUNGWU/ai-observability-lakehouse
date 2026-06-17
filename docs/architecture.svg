@@ -134,7 +134,7 @@
 <rect x="430" y="368" width="310" height="56" rx="10" fill="#0D47A1"
       stroke="#1565C0" stroke-width="1"/>
 <text x="585" y="392" text-anchor="middle" font-size="14" font-weight="700" fill="#FFF">Paimon DWD 明细事实表</text>
-<text x="585" y="412" text-anchor="middle" font-size="9" fill="#90CAF9">llm_request_events · PRIMARY KEY · 4 buckets</text>
+<text x="585" y="412" text-anchor="middle" font-size="9" fill="#90CAF9">dwd_ai_llm_request_di · PRIMARY KEY · 4 buckets</text>
 
 <!-- Spark Backfill → DWD -->
 <rect x="800" y="370" width="200" height="50" rx="6" fill="#E65100"/>
@@ -170,7 +170,7 @@
 <rect x="430" y="458" width="310" height="56" rx="10" fill="#0D47A1"
       stroke="#1565C0" stroke-width="1"/>
 <text x="585" y="482" text-anchor="middle" font-size="14" font-weight="700" fill="#FFF">Paimon DWS 汇总指标表</text>
-<text x="585" y="502" text-anchor="middle" font-size="9" fill="#90CAF9">llm_feature_daily_metrics · 日粒度 · 可加聚合</text>
+<text x="585" y="502" text-anchor="middle" font-size="9" fill="#90CAF9">dws_ai_llm_feature_request_1d · 日粒度 · 可加聚合</text>
 
 <!-- Spark Backfill → DWS -->
 <rect x="800" y="460" width="200" height="50" rx="6" fill="#E65100"/>
@@ -213,12 +213,12 @@
 <!-- ADS: Cost Anomaly -->
 <rect x="180" y="610" width="200" height="46" rx="6" fill="#E65100"/>
 <text x="280" y="631" text-anchor="middle" font-size="11" font-weight="500" fill="#FFF">成本异常检测</text>
-<text x="280" y="648" text-anchor="middle" font-size="8" fill="#FFCCBC">ads_cost_anomaly_daily</text>
+<text x="280" y="648" text-anchor="middle" font-size="8" fill="#FFCCBC">ads_observability_cost_feature_anomaly</text>
 
 <!-- ADS: SLA -->
 <rect x="430" y="610" width="200" height="46" rx="6" fill="#E65100"/>
 <text x="530" y="631" text-anchor="middle" font-size="11" font-weight="500" fill="#FFF">SLA 达标报告</text>
-<text x="530" y="648" text-anchor="middle" font-size="8" fill="#FFCCBC">ads_sla_daily_report</text>
+<text x="530" y="648" text-anchor="middle" font-size="8" fill="#FFCCBC">ads_observability_sla_feature_report</text>
 
 <!-- ADS: Prompt Version -->
 <rect x="680" y="610" width="220" height="46" rx="6" fill="#E65100"/>

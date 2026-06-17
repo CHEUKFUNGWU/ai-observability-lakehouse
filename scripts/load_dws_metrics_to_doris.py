@@ -8,8 +8,8 @@ import pymysql
 
 from app.logging_utils import get_logger, log_info
 
-DEFAULT_INPUT_PATH = Path("data/warehouse/dws/llm_feature_daily_metrics.parquet")
-DEFAULT_TABLE_NAME = "dws_llm_feature_daily_metrics"
+DEFAULT_INPUT_PATH = Path("data/warehouse/dws/dws_ai_llm_feature_request_1d.parquet")
+DEFAULT_TABLE_NAME = "dws_ai_llm_feature_request_1d"
 DEFAULT_DATABASE = "ai_observability"
 DEFAULT_USER = "root"
 DEFAULT_PASSWORD = ""
