@@ -382,7 +382,7 @@ Joins `dws_ai_cost_team_request_1d` with `dim_team_df.budget_monthly_usd`. Compu
 
 Monthly grain. Final chargeback amount per team/cost center for finance systems.
 
-Implementation status: `dim_team_df`, `dim_user_df`, `dws_ai_cost_team_request_1d`, and `ads_observability_cost_daily_budget` are implemented as the first Tier 2 slice. Monthly chargeback remains planned.
+Implementation status: `dim_team_df`, `dim_user_df`, `dws_ai_cost_team_request_1d`, `ads_observability_cost_daily_budget`, and `ads_observability_cost_monthly_chargeback` are implemented as the first Tier 2 cost governance slice.
 
 ---
 
