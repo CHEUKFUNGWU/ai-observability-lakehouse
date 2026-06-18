@@ -1,4 +1,32 @@
--- Build daily feature metrics from DWD.
+-- Build hourly feature metrics from DWD using event-time windows.
+
+INSERT INTO paimon_lake.dws.dws_ai_llm_feature_request_1h
+SELECT
+    CAST(window_start AS DATE) AS `date`,
+    CAST(EXTRACT(HOUR FROM window_start) AS INT) AS `hour`,
+    app_name,
+    feature_name,
+    model_name,
+    COUNT(*) AS request_cnt_1h,
+    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_cnt_1h,
+    SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_cnt_1h,
+    SUM(prompt_tokens) AS prompt_token_cnt_1h,
+    SUM(completion_tokens) AS completion_token_cnt_1h,
+    SUM(total_tokens) AS total_token_cnt_1h,
+    SUM(estimated_cost_usd) AS estimated_cost_amt_1h,
+    AVG(latency_ms) AS avg_latency_ms,
+    CAST(MAX(latency_ms) AS BIGINT) AS max_latency_ms,
+    CAST(0 AS BIGINT) AS p95_latency_ms
+FROM TABLE(
+    TUMBLE(
+        TABLE paimon_lake.dwd.dwd_ai_llm_request_di,
+        DESCRIPTOR(created_at),
+        INTERVAL '1' HOUR
+    )
+)
+GROUP BY window_start, app_name, feature_name, model_name;
+
+-- Daily feature metrics roll up the hourly table so both grains share one definition.
 
 INSERT INTO paimon_lake.dws.dws_ai_llm_feature_request_1d
 SELECT
@@ -6,19 +34,17 @@ SELECT
     app_name,
     feature_name,
     model_name,
-    COUNT(*) AS request_count,
-    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_count,
-    SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_count,
-    SUM(prompt_tokens) AS prompt_tokens,
-    SUM(completion_tokens) AS completion_tokens,
-    SUM(total_tokens) AS total_tokens,
-    SUM(estimated_cost_usd) AS estimated_cost_usd,
-    AVG(latency_ms) AS avg_latency_ms,
-    -- Flink 1.20 SQL does not support PERCENTILE_CONT as a streaming aggregate.
-    -- Store an explicit upper-bound metric instead of naming MAX latency as p95.
-    CAST(MAX(latency_ms) AS BIGINT) AS max_latency_ms,
+    SUM(request_cnt_1h) AS request_count,
+    SUM(success_cnt_1h) AS success_count,
+    SUM(error_cnt_1h) AS error_count,
+    SUM(prompt_token_cnt_1h) AS prompt_tokens,
+    SUM(completion_token_cnt_1h) AS completion_tokens,
+    SUM(total_token_cnt_1h) AS total_tokens,
+    SUM(estimated_cost_amt_1h) AS estimated_cost_usd,
+    SUM(avg_latency_ms * request_cnt_1h) / SUM(request_cnt_1h) AS avg_latency_ms,
+    MAX(max_latency_ms) AS max_latency_ms,
     CAST(0 AS BIGINT) AS p95_latency_ms
-FROM paimon_lake.dwd.dwd_ai_llm_request_di
+FROM paimon_lake.dws.dws_ai_llm_feature_request_1h
 GROUP BY `date`, app_name, feature_name, model_name;
 
 INSERT INTO paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d
@@ -129,3 +155,48 @@ SELECT
     CAST(MAX(latency_ms) AS BIGINT) AS p95_latency_ms
 FROM paimon_lake.dwd.dwd_ai_llm_request_di
 GROUP BY `date`, region, environment, app_name, model_name;
+
+INSERT INTO paimon_lake.dws.dws_ai_llm_session_request_1d
+WITH session_metrics AS (
+    SELECT
+        `date`,
+        app_name,
+        feature_name,
+        session_id,
+        COUNT(*) AS turn_cnt,
+        SUM(total_tokens) AS token_cnt,
+        TIMESTAMPDIFF(MILLISECOND, MIN(created_at), MAX(created_at)) + MAX(latency_ms) AS session_duration_ms
+    FROM paimon_lake.dwd.dwd_ai_llm_request_di
+    GROUP BY `date`, app_name, feature_name, session_id
+),
+resolved_sessions AS (
+    SELECT
+        `date`,
+        app_name,
+        feature_name,
+        session_id,
+        MAX(
+            CASE
+                WHEN feedback_type = 'thumbs_up' OR (feedback_type = 'rating' AND rating_value >= 4) THEN 1
+                ELSE 0
+            END
+        ) AS is_resolved
+    FROM paimon_lake.dwd.dwd_ai_feedback_action_di
+    GROUP BY `date`, app_name, feature_name, session_id
+)
+SELECT
+    sessions.`date`,
+    sessions.app_name,
+    sessions.feature_name,
+    COUNT(*) AS session_cnt_1d,
+    AVG(sessions.turn_cnt) AS avg_turns_per_session,
+    AVG(sessions.token_cnt) AS avg_tokens_per_session,
+    AVG(sessions.session_duration_ms) AS avg_duration_per_session_ms,
+    SUM(COALESCE(feedback.is_resolved, 0)) AS resolved_session_cnt_1d
+FROM session_metrics AS sessions
+LEFT JOIN resolved_sessions AS feedback
+    ON sessions.`date` = feedback.`date`
+    AND sessions.app_name = feedback.app_name
+    AND sessions.feature_name = feedback.feature_name
+    AND sessions.session_id = feedback.session_id
+GROUP BY sessions.`date`, sessions.app_name, sessions.feature_name;

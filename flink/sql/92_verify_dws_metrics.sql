@@ -50,3 +50,13 @@ SELECT
     COUNT(*) AS dws_agent_team_metric_rows,
     SUM(run_cnt_1d) AS total_team_run_cnt_1d
 FROM paimon_lake.dws.dws_ai_agent_team_run_1d;
+
+SELECT
+    COUNT(*) AS dws_llm_feature_hourly_metric_rows,
+    SUM(request_cnt_1h) AS total_hourly_request_cnt_1h
+FROM paimon_lake.dws.dws_ai_llm_feature_request_1h;
+
+SELECT
+    COUNT(*) AS dws_llm_session_metric_rows,
+    SUM(session_cnt_1d) AS total_session_cnt_1d
+FROM paimon_lake.dws.dws_ai_llm_session_request_1d;

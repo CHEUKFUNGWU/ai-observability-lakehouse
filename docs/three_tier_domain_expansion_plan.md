@@ -532,6 +532,8 @@ Implementation status: Tier 2 granularity expansions are implemented. `dws_ai_co
 | Prompt engineering | Parse prompt registry (Git repo, config DB, or API) | Medium |
 | Model deployment | Parse CI/CD events (GitHub Actions, ArgoCD, internal deploy API) | Medium-High |
 
+Implementation status: `ads_observability_executive_weekly_summary` is implemented at week-and-app grain. It combines LLM, Agent, retrieval, feedback, guardrail, evaluation, and cost metrics for management reporting.
+
 ---
 
 ## 5. Tier 3 — Compliance, Multi-Agent, and Platform Health (Month 5+)
@@ -641,6 +643,8 @@ Source: Kafka JMX, Flink REST API, Paimon catalog metadata, Doris `information_s
 
 Hourly DWS tables use the same schema as daily DWS but with `hour` (int, 0-23) as an additional grouping key. In Flink, hourly aggregation uses a 1-hour tumble window. Daily DWS remains as a rollup from hourly.
 
+Implementation: `dws_ai_llm_feature_request_1h` is implemented with Spark batch aggregation and a Flink 1-hour tumble-window path, with Paimon and Doris serving tables.
+
 ### 6.2 Organization Granularity
 
 ```text
@@ -670,6 +674,8 @@ Implementation: `dim_team` and `dim_user` (Tier 2) enable team-level and user-le
 | resolved_session_count | long | Sessions marked as resolved (if feedback exists) |
 
 Built from: `dwd_ai_llm_request_di` grouped by `session_id`, then aggregated to daily.
+
+Implementation: `dws_ai_llm_session_request_1d` is implemented. A session is resolved when it has a `thumbs_up` feedback event or a rating of at least 4. Session duration runs from the first request start to the last request completion within the daily app/feature/session grain.
 
 ### 6.4 Region / Environment Granularity
 

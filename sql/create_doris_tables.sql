@@ -10,6 +10,8 @@ DROP TABLE IF EXISTS ai_observability.dwd_ai_guardrail_check_di;
 DROP TABLE IF EXISTS ai_observability.dwd_ai_evaluation_judgment_di;
 DROP TABLE IF EXISTS ai_observability.dwd_ai_model_deployment_di;
 DROP TABLE IF EXISTS ai_observability.dws_ai_llm_feature_request_1d;
+DROP TABLE IF EXISTS ai_observability.dws_ai_llm_feature_request_1h;
+DROP TABLE IF EXISTS ai_observability.dws_ai_llm_session_request_1d;
 DROP TABLE IF EXISTS ai_observability.dws_ai_agent_agent_run_1d;
 DROP TABLE IF EXISTS ai_observability.dws_ai_agent_tool_tool_call_1d;
 DROP TABLE IF EXISTS ai_observability.dws_ai_retrieval_knowledge_base_request_1d;
@@ -36,6 +38,7 @@ DROP TABLE IF EXISTS ai_observability.ads_observability_feedback_daily_satisfact
 DROP TABLE IF EXISTS ai_observability.ads_observability_guardrail_daily_violation;
 DROP TABLE IF EXISTS ai_observability.ads_observability_cost_daily_budget;
 DROP TABLE IF EXISTS ai_observability.ads_observability_cost_monthly_chargeback;
+DROP TABLE IF EXISTS ai_observability.ads_observability_executive_weekly_summary;
 DROP MATERIALIZED VIEW IF EXISTS ai_observability.mv_daily_summary;
 
 CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_llm_request_di
@@ -236,6 +239,63 @@ CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_feature_request_1d
     p95_latency_ms BIGINT NOT NULL
 )
 DUPLICATE KEY(`date`, app_name, feature_name, model_name)
+PARTITION BY RANGE(`date`) ()
+DISTRIBUTED BY HASH(app_name, feature_name) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "MONTH",
+    "dynamic_partition.start" = "-12",
+    "dynamic_partition.end" = "3",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "4",
+    "dynamic_partition.create_history_partition" = "true"
+);
+
+CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_feature_request_1h
+(
+    `date` DATE NOT NULL,
+    `hour` TINYINT NOT NULL,
+    app_name VARCHAR(256) NOT NULL,
+    feature_name VARCHAR(256) NOT NULL,
+    model_name VARCHAR(256) NOT NULL,
+    request_cnt_1h BIGINT NOT NULL,
+    success_cnt_1h BIGINT NOT NULL,
+    error_cnt_1h BIGINT NOT NULL,
+    prompt_token_cnt_1h BIGINT NOT NULL,
+    completion_token_cnt_1h BIGINT NOT NULL,
+    total_token_cnt_1h BIGINT NOT NULL,
+    estimated_cost_amt_1h DOUBLE NOT NULL,
+    avg_latency_ms DOUBLE NOT NULL,
+    max_latency_ms BIGINT NOT NULL,
+    p95_latency_ms BIGINT NOT NULL
+)
+DUPLICATE KEY(`date`, `hour`, app_name, feature_name, model_name)
+PARTITION BY RANGE(`date`) ()
+DISTRIBUTED BY HASH(app_name, feature_name) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "MONTH",
+    "dynamic_partition.start" = "-12",
+    "dynamic_partition.end" = "3",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "4",
+    "dynamic_partition.create_history_partition" = "true"
+);
+
+CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_session_request_1d
+(
+    `date` DATE NOT NULL,
+    app_name VARCHAR(256) NOT NULL,
+    feature_name VARCHAR(256) NOT NULL,
+    session_cnt_1d BIGINT NOT NULL,
+    avg_turns_per_session DOUBLE NOT NULL,
+    avg_tokens_per_session DOUBLE NOT NULL,
+    avg_duration_per_session_ms DOUBLE NOT NULL,
+    resolved_session_cnt_1d BIGINT NOT NULL
+)
+DUPLICATE KEY(`date`, app_name, feature_name)
 PARTITION BY RANGE(`date`) ()
 DISTRIBUTED BY HASH(app_name, feature_name) BUCKETS 4
 PROPERTIES (
@@ -1129,6 +1189,53 @@ CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_monthly_charg
 DUPLICATE KEY(month_start_date, team_id)
 PARTITION BY RANGE(month_start_date) ()
 DISTRIBUTED BY HASH(team_id) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "MONTH",
+    "dynamic_partition.start" = "-12",
+    "dynamic_partition.end" = "3",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "4",
+    "dynamic_partition.create_history_partition" = "true"
+);
+
+CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_executive_weekly_summary
+(
+    week_start_date DATE NOT NULL,
+    app_name VARCHAR(256) NOT NULL,
+    request_cnt_1w BIGINT NOT NULL,
+    success_cnt_1w BIGINT NOT NULL,
+    error_cnt_1w BIGINT NOT NULL,
+    total_token_cnt_1w BIGINT NOT NULL,
+    llm_cost_amt_1w DOUBLE NOT NULL,
+    p95_latency_ms_max BIGINT NULL,
+    agent_run_cnt_1w BIGINT NOT NULL,
+    agent_success_cnt_1w BIGINT NOT NULL,
+    agent_error_cnt_1w BIGINT NOT NULL,
+    agent_cost_amt_1w DOUBLE NOT NULL,
+    retrieval_cnt_1w BIGINT NOT NULL,
+    retrieval_returned_cnt_1w BIGINT NOT NULL,
+    retrieval_hit_cnt_1w BIGINT NOT NULL,
+    feedback_cnt_1w BIGINT NOT NULL,
+    thumbs_up_cnt_1w BIGINT NOT NULL,
+    thumbs_down_cnt_1w BIGINT NOT NULL,
+    guardrail_check_cnt_1w BIGINT NOT NULL,
+    guardrail_triggered_cnt_1w BIGINT NOT NULL,
+    guardrail_block_cnt_1w BIGINT NOT NULL,
+    evaluation_cnt_1w BIGINT NOT NULL,
+    evaluation_pass_cnt_1w BIGINT NOT NULL,
+    evaluation_fail_cnt_1w BIGINT NOT NULL,
+    avg_latency_ms DOUBLE NULL,
+    retrieval_hit_rate_1w DOUBLE NULL,
+    satisfaction_rate_1w DOUBLE NULL,
+    evaluation_pass_rate_1w DOUBLE NULL,
+    avg_evaluation_score DOUBLE NULL,
+    total_ai_cost_amt_1w DOUBLE NOT NULL
+)
+DUPLICATE KEY(week_start_date, app_name)
+PARTITION BY RANGE(week_start_date) ()
+DISTRIBUTED BY HASH(app_name) BUCKETS 4
 PROPERTIES (
     "replication_num" = "1",
     "dynamic_partition.enable" = "true",

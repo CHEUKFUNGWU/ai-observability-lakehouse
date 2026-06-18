@@ -49,7 +49,7 @@ Expected long-running SQL jobs:
 | --- | --- | --- | --- |
 | `flink/sql/10_ingest_ods_to_kafka.sql` | CDC ingest | Postgres CDC source table | Kafka ODS topic |
 | `flink/sql/20_build_dwd_from_kafka_ods.sql` | DWD transform and data quality filter | Kafka ODS topic | Paimon DWD |
-| `flink/sql/30_build_dws_from_dwd.sql` | DWS streaming aggregation | Paimon DWD | Paimon DWS |
+| `flink/sql/30_build_dws_from_dwd.sql` | Daily, hourly and session DWS streaming aggregation | Paimon DWD | Paimon DWS |
 
 Submit the streaming jobs:
 
@@ -137,11 +137,23 @@ The health check verifies:
 - Postgres source table `public.llm_request_events` has rows.
 - Flink REST API is reachable.
 - DWD and DWS streaming jobs are running.
+- Hourly feature and daily session DWS jobs are running.
 - Doris FE is queryable when serving checks are enabled.
 
 This is a fast operational check. It does not replace deeper table-level
 verification queries such as `flink/sql/91_verify_dwd_count.sql` and
 `flink/sql/92_verify_dws_metrics.sql`.
+
+The hourly feature job uses a five-second event-time watermark and a one-hour tumble window. The session job resolves sessions from positive feedback (`thumbs_up` or rating >= 4).
+
+Build and load the executive weekly summary after the daily DWS Parquet outputs are available:
+
+```bash
+uv run python -m scripts.spark_build_ads_executive_weekly_summary
+uv run python -m scripts.load_dws_metrics_to_doris \
+  --input data/warehouse/ads/ads_observability_executive_weekly_summary.parquet \
+  --table ads_observability_executive_weekly_summary
+```
 
 ## Flink Recovery
 

@@ -236,3 +236,30 @@ FROM ai_observability.dws_ai_agent_tool_tool_call_1d
 GROUP BY tool_name
 ORDER BY failure_rate DESC;
 ```
+
+---
+
+## 14. Resolved Session Count
+
+### Definition
+
+Distinct daily sessions with positive feedback. A session is resolved when it has a `thumbs_up` event or a rating value of at least 4.
+
+Session duration is measured from the first request start to the last request completion within the same date, app, feature, and session.
+
+---
+
+## 15. Executive Weekly Weighted Metrics
+
+### Definition
+
+`ads_observability_executive_weekly_summary` is grouped by ISO week start date and application. Average request latency and evaluation score are weighted by their request/evaluation counts rather than averaging daily averages.
+
+```text
+avg_latency_ms = sum(daily_avg_latency_ms * daily_request_count) / sum(daily_request_count)
+avg_evaluation_score = sum(daily_avg_score * daily_evaluation_count) / sum(daily_evaluation_count)
+retrieval_hit_rate_1w = retrieval_hit_cnt_1w / retrieval_returned_cnt_1w
+satisfaction_rate_1w = thumbs_up_cnt_1w / (thumbs_up_cnt_1w + thumbs_down_cnt_1w)
+evaluation_pass_rate_1w = evaluation_pass_cnt_1w / evaluation_cnt_1w
+total_ai_cost_amt_1w = llm_cost_amt_1w + agent_cost_amt_1w
+```

@@ -98,6 +98,8 @@ expected = {
     "insert-into_paimon_lake.dws.dws_ai_feedback_feature_action_1d": False,
     "insert-into_paimon_lake.dws.dws_ai_guardrail_rule_check_1d": False,
     "insert-into_paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d": False,
+    "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1h": False,
+    "insert-into_paimon_lake.dws.dws_ai_llm_session_request_1d": False,
 }
 for name in running_names:
     for expected_name in expected:

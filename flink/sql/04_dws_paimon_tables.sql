@@ -20,6 +20,41 @@ CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_llm_feature_request_1d (
     'bucket' = '4'
 );
 
+CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_llm_feature_request_1h (
+    `date` DATE,
+    `hour` INT,
+    app_name STRING,
+    feature_name STRING,
+    model_name STRING,
+    request_cnt_1h BIGINT,
+    success_cnt_1h BIGINT,
+    error_cnt_1h BIGINT,
+    prompt_token_cnt_1h BIGINT,
+    completion_token_cnt_1h BIGINT,
+    total_token_cnt_1h BIGINT,
+    estimated_cost_amt_1h DOUBLE,
+    avg_latency_ms DOUBLE,
+    max_latency_ms BIGINT,
+    p95_latency_ms BIGINT,
+    PRIMARY KEY (`date`, `hour`, app_name, feature_name, model_name) NOT ENFORCED
+) PARTITIONED BY (`date`) WITH (
+    'bucket' = '4'
+);
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_llm_session_request_1d (
+    `date` DATE,
+    app_name STRING,
+    feature_name STRING,
+    session_cnt_1d BIGINT,
+    avg_turns_per_session DOUBLE,
+    avg_tokens_per_session DOUBLE,
+    avg_duration_per_session_ms DOUBLE,
+    resolved_session_cnt_1d BIGINT,
+    PRIMARY KEY (`date`, app_name, feature_name) NOT ENFORCED
+) PARTITIONED BY (`date`) WITH (
+    'bucket' = '4'
+);
+
 CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d (
     `date` DATE,
     app_name STRING,
