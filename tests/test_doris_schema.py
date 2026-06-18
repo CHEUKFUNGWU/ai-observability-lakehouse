@@ -42,6 +42,7 @@ def test_doris_schema_defines_llm_agent_and_tool_tables():
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_feedback_daily_satisfaction" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_guardrail_daily_violation" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_daily_budget" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_monthly_chargeback" in sql
     assert "CREATE MATERIALIZED VIEW IF NOT EXISTS ai_observability.mv_daily_summary" in sql
 
 

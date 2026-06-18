@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS ai_observability.ads_observability_retrieval_daily_quality;
 DROP TABLE IF EXISTS ai_observability.ads_observability_feedback_daily_satisfaction;
 DROP TABLE IF EXISTS ai_observability.ads_observability_guardrail_daily_violation;
 DROP TABLE IF EXISTS ai_observability.ads_observability_cost_daily_budget;
+DROP TABLE IF EXISTS ai_observability.ads_observability_cost_monthly_chargeback;
 DROP MATERIALIZED VIEW IF EXISTS ai_observability.mv_daily_summary;
 
 CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_llm_request_di
@@ -1096,6 +1097,38 @@ CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_daily_budget
 DUPLICATE KEY(`date`, team_id, app_name)
 PARTITION BY RANGE(`date`) ()
 DISTRIBUTED BY HASH(team_id, app_name) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "MONTH",
+    "dynamic_partition.start" = "-12",
+    "dynamic_partition.end" = "3",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "4",
+    "dynamic_partition.create_history_partition" = "true"
+);
+
+CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_monthly_chargeback
+(
+    month_start_date DATE NOT NULL,
+    team_id VARCHAR(128) NOT NULL,
+    team_name VARCHAR(256) NULL,
+    department VARCHAR(256) NULL,
+    cost_center VARCHAR(128) NULL,
+    request_cnt_1m BIGINT NOT NULL,
+    total_token_cnt_1m BIGINT NOT NULL,
+    llm_cost_amt_1m DOUBLE NOT NULL,
+    agent_run_cnt_1m BIGINT NOT NULL,
+    agent_cost_amt_1m DOUBLE NOT NULL,
+    chargeback_amt_1m DOUBLE NOT NULL,
+    budget_monthly_amt DOUBLE NULL,
+    budget_variance_amt_1m DOUBLE NULL,
+    budget_utilization_rate_1m DOUBLE NULL,
+    is_budget_overrun BOOLEAN NOT NULL
+)
+DUPLICATE KEY(month_start_date, team_id)
+PARTITION BY RANGE(month_start_date) ()
+DISTRIBUTED BY HASH(team_id) BUCKETS 4
 PROPERTIES (
     "replication_num" = "1",
     "dynamic_partition.enable" = "true",
