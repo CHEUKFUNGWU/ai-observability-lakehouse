@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_llm_request_di (
     environment STRING,
     created_at TIMESTAMP(3),
     `date` DATE,
+    WATERMARK FOR created_at AS created_at - INTERVAL '5' SECOND,
     PRIMARY KEY (request_id) NOT ENFORCED
 ) WITH (
     'bucket' = '4'

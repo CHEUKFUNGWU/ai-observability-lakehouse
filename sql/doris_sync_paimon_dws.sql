@@ -8,6 +8,8 @@ TRUNCATE TABLE ai_observability.dws_ai_prompt_version_request_1d;
 TRUNCATE TABLE ai_observability.dws_ai_llm_feature_env_request_1d;
 TRUNCATE TABLE ai_observability.dws_ai_llm_region_request_1d;
 TRUNCATE TABLE ai_observability.dws_ai_agent_team_run_1d;
+TRUNCATE TABLE ai_observability.dws_ai_llm_feature_request_1h;
+TRUNCATE TABLE ai_observability.dws_ai_llm_session_request_1d;
 
 INSERT INTO ai_observability.dws_ai_llm_feature_request_1d
 SELECT *
@@ -48,3 +50,11 @@ FROM paimon_lake.dws.dws_ai_llm_region_request_1d;
 INSERT INTO ai_observability.dws_ai_agent_team_run_1d
 SELECT *
 FROM paimon_lake.dws.dws_ai_agent_team_run_1d;
+
+INSERT INTO ai_observability.dws_ai_llm_feature_request_1h
+SELECT *
+FROM paimon_lake.dws.dws_ai_llm_feature_request_1h;
+
+INSERT INTO ai_observability.dws_ai_llm_session_request_1d
+SELECT *
+FROM paimon_lake.dws.dws_ai_llm_session_request_1d;

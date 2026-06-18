@@ -71,7 +71,10 @@ def test_paimon_layers_use_expected_tables():
     assert "paimon_lake.dwd.dwd_ai_guardrail_check_di" in dwd_sql
     assert "paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in dwd_sql
     assert "paimon_lake.dwd.dwd_ai_model_deployment_di" in dwd_sql
+    assert "WATERMARK FOR created_at AS created_at - INTERVAL '5' SECOND" in dwd_sql
     assert "paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
+    assert "paimon_lake.dws.dws_ai_llm_feature_request_1h" in dws_sql
+    assert "paimon_lake.dws.dws_ai_llm_session_request_1d" in dws_sql
     assert "paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d" in dws_sql
     assert "paimon_lake.dws.dws_ai_feedback_feature_action_1d" in dws_sql
     assert "paimon_lake.dws.dws_ai_guardrail_rule_check_1d" in dws_sql
@@ -114,6 +117,8 @@ def test_flink_sql_layer_dependencies_are_explicit():
     assert "estimated_cost_usd >= 0" in dwd_sql
     assert "mode IN ('mock', 'live', 'replay', 'hermes')" in dwd_sql
     assert "INSERT INTO paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
+    assert "INSERT INTO paimon_lake.dws.dws_ai_llm_feature_request_1h" in dws_sql
+    assert "INSERT INTO paimon_lake.dws.dws_ai_llm_session_request_1d" in dws_sql
     assert "INSERT INTO paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d" in dws_sql
     assert "INSERT INTO paimon_lake.dws.dws_ai_feedback_feature_action_1d" in dws_sql
     assert "INSERT INTO paimon_lake.dws.dws_ai_guardrail_rule_check_1d" in dws_sql
@@ -121,6 +126,10 @@ def test_flink_sql_layer_dependencies_are_explicit():
     assert "INSERT INTO paimon_lake.dws.dws_ai_llm_feature_env_request_1d" in dws_sql
     assert "INSERT INTO paimon_lake.dws.dws_ai_llm_region_request_1d" in dws_sql
     assert "FROM paimon_lake.dwd.dwd_ai_llm_request_di" in dws_sql
+    assert "FROM paimon_lake.dws.dws_ai_llm_feature_request_1h" in dws_sql
+    assert "TUMBLE(" in dws_sql
+    assert "INTERVAL '1' HOUR" in dws_sql
+    assert "FROM paimon_lake.dwd.dwd_ai_feedback_action_di" in dws_sql
     assert "CAST(MAX(latency_ms) AS BIGINT) AS max_latency_ms" in dws_sql
     assert "CAST(0 AS BIGINT) AS p95_latency_ms" in dws_sql
     assert "PERCENTILE_CONT(" not in dws_sql
@@ -149,6 +158,8 @@ def test_flink_verify_sql_covers_dwd_and_dws_layers():
     assert "COUNT(*) AS dws_llm_feature_env_metric_rows" in dws_sql
     assert "COUNT(*) AS dws_llm_region_metric_rows" in dws_sql
     assert "COUNT(*) AS dws_agent_team_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_llm_feature_hourly_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_llm_session_metric_rows" in dws_sql
     assert "SUM(request_count) AS total_request_count" in dws_sql
     assert "FROM paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
 
@@ -276,6 +287,8 @@ def test_light_and_serving_demo_commands_are_split():
     assert "insert-into_paimon_lake.dws.dws_ai_feedback_feature_action_1d" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_guardrail_rule_check_1d" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d" in health_script
+    assert "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1h" in health_script
+    assert "insert-into_paimon_lake.dws.dws_ai_llm_session_request_1d" in health_script
 
 
 def test_flink_warehouse_prepare_script_creates_checkpoint_dirs():

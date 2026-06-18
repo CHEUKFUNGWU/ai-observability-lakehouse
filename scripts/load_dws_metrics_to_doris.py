@@ -31,6 +31,42 @@ LOAD_COLUMNS = [
     "max_latency_ms",
     "p95_latency_ms",
 ]
+EXECUTIVE_WEEKLY_COLUMNS = [
+    "week_start_date",
+    "app_name",
+    "request_cnt_1w",
+    "success_cnt_1w",
+    "error_cnt_1w",
+    "total_token_cnt_1w",
+    "llm_cost_amt_1w",
+    "p95_latency_ms_max",
+    "agent_run_cnt_1w",
+    "agent_success_cnt_1w",
+    "agent_error_cnt_1w",
+    "agent_cost_amt_1w",
+    "retrieval_cnt_1w",
+    "retrieval_returned_cnt_1w",
+    "retrieval_hit_cnt_1w",
+    "feedback_cnt_1w",
+    "thumbs_up_cnt_1w",
+    "thumbs_down_cnt_1w",
+    "guardrail_check_cnt_1w",
+    "guardrail_triggered_cnt_1w",
+    "guardrail_block_cnt_1w",
+    "evaluation_cnt_1w",
+    "evaluation_pass_cnt_1w",
+    "evaluation_fail_cnt_1w",
+    "avg_latency_ms",
+    "retrieval_hit_rate_1w",
+    "satisfaction_rate_1w",
+    "evaluation_pass_rate_1w",
+    "avg_evaluation_score",
+    "total_ai_cost_amt_1w",
+]
+TABLE_LOAD_COLUMNS = {
+    DEFAULT_TABLE_NAME: LOAD_COLUMNS,
+    "ads_observability_executive_weekly_summary": EXECUTIVE_WEEKLY_COLUMNS,
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -53,10 +89,18 @@ def read_parquet_rows(input_path: Path) -> list[dict]:
 def normalize_row(row: dict) -> dict:
     normalized = dict(row)
 
-    if isinstance(normalized["date"], str):
-        normalized["date"] = date.fromisoformat(normalized["date"])
+    for field_name, value in normalized.items():
+        if (field_name == "date" or field_name.endswith("_date")) and isinstance(value, str):
+            normalized[field_name] = date.fromisoformat(value)
 
     return normalized
+
+
+def columns_for_table(table: str) -> list[str]:
+    try:
+        return TABLE_LOAD_COLUMNS[table]
+    except KeyError as error:
+        raise ValueError(f"Unsupported Doris load table: {table!r}") from error
 
 
 def validate_doris_identifier(identifier: str) -> str:
@@ -79,7 +123,9 @@ def load_rows_to_doris(
     port: int,
     user: str,
     password: str,
+    columns: list[str] | None = None,
 ) -> None:
+    load_columns = columns or columns_for_table(table)
     connection = pymysql.connect(
         host=host,
         port=port,
@@ -99,10 +145,10 @@ def load_rows_to_doris(
                 connection.commit()
                 return
 
-            placeholders = ", ".join(["%s"] * len(LOAD_COLUMNS))
-            column_clause = ", ".join(f"`{column}`" for column in LOAD_COLUMNS)
+            placeholders = ", ".join(["%s"] * len(load_columns))
+            column_clause = ", ".join(f"`{column}`" for column in load_columns)
             insert_sql = f"INSERT INTO {table_name} ({column_clause}) VALUES ({placeholders})"
-            values = [tuple(row[column] for column in LOAD_COLUMNS) for row in rows]
+            values = [tuple(row[column] for column in load_columns) for row in rows]
             cursor.executemany(insert_sql, values)
 
         connection.commit()

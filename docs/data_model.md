@@ -458,6 +458,8 @@ Tier 1 expands the runtime observability model beyond LLM and Agent execution:
 | `dws_ai_retrieval_knowledge_base_request_1d` | One daily row per app, knowledge base, embedding model and strategy | Retrieval volume, zero-result count, hit count, similarity and latency metrics |
 | `dws_ai_feedback_feature_action_1d` | One daily row per app, feature and agent | Feedback volume, positive/negative counts, regeneration/report counts and average rating |
 | `dws_ai_guardrail_rule_check_1d` | One daily row per app, rule category and action | Guardrail check volume, trigger/action counts, latency and distinct users |
+| `dws_ai_llm_feature_request_1h` | One hourly row per app, feature and model | Request, token, cost and latency metrics for near-real-time dashboards |
+| `dws_ai_llm_session_request_1d` | One daily row per app and feature | Session count, turns, tokens, duration and positive-resolution count |
 | `ads_observability_retrieval_daily_quality` | Daily retrieval quality mart | Hit rate, zero-result rate and latency breach flags |
 | `ads_observability_feedback_daily_satisfaction` | Daily satisfaction mart | Satisfaction rate, regeneration rate and breach flags |
 | `ads_observability_guardrail_daily_violation` | Daily guardrail violation mart | Trigger/block rates and policy-latency breach flags |
@@ -480,5 +482,6 @@ Tier 2 starts with cost-governance tables:
 | `dws_ai_llm_feature_env_request_1d` | One daily row per app, feature, model and environment | Prod/staging/dev split of request volume, success/error counts, tokens, cost and latency |
 | `dws_ai_llm_region_request_1d` | One daily row per region, environment, app and model | Regional request volume, success/error counts, tokens, cost and latency |
 | `dws_ai_agent_team_run_1d` | One daily row per team, app, agent and task type | Team-attributed agent run volume, success/error counts, tokens, cost, duration and span metrics |
+| `ads_observability_executive_weekly_summary` | One weekly row per app | Cross-domain LLM, Agent, retrieval, feedback, guardrail, evaluation and cost summary |
 
-Remaining planned extensions include agent, compliance and platform-health dimensions.
+Tier 1 and Tier 2 table inventory is implemented. Remaining planned extensions are Tier 3 compliance, multi-agent orchestration and platform-health facts.

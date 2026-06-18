@@ -157,6 +157,8 @@ postgres.public.llm_request_events
 → ods_ai_observability_llm_request_events_di
 → paimon_lake.dwd.dwd_ai_llm_request_di
 → paimon_lake.dws.dws_ai_llm_feature_request_1d
+→ paimon_lake.dws.dws_ai_llm_feature_request_1h
+→ paimon_lake.dws.dws_ai_llm_session_request_1d
 ```
 
 Flink SQL assets are stored in:

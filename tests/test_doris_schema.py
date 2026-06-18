@@ -17,6 +17,8 @@ def test_doris_schema_defines_llm_agent_and_tool_tables():
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_evaluation_judgment_di" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_model_deployment_di" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_feature_request_1d" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_feature_request_1h" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_session_request_1d" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_agent_agent_run_1d" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_agent_tool_tool_call_1d" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_retrieval_knowledge_base_request_1d" in sql
@@ -43,6 +45,7 @@ def test_doris_schema_defines_llm_agent_and_tool_tables():
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_guardrail_daily_violation" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_daily_budget" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_monthly_chargeback" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_executive_weekly_summary" in sql
     assert "CREATE MATERIALIZED VIEW IF NOT EXISTS ai_observability.mv_daily_summary" in sql
 
 
@@ -93,3 +96,7 @@ def test_doris_paimon_catalog_sql_assets_exist():
     assert "FROM paimon_lake.dws.dws_ai_llm_region_request_1d" in sync_sql
     assert "INSERT INTO ai_observability.dws_ai_agent_team_run_1d" in sync_sql
     assert "FROM paimon_lake.dws.dws_ai_agent_team_run_1d" in sync_sql
+    assert "INSERT INTO ai_observability.dws_ai_llm_feature_request_1h" in sync_sql
+    assert "FROM paimon_lake.dws.dws_ai_llm_feature_request_1h" in sync_sql
+    assert "INSERT INTO ai_observability.dws_ai_llm_session_request_1d" in sync_sql
+    assert "FROM paimon_lake.dws.dws_ai_llm_session_request_1d" in sync_sql
