@@ -19,14 +19,24 @@ def load_parquet(spark: SparkSession, input_path: Path) -> DataFrame:
 
 
 def build_cost_monthly_chargeback(metrics: DataFrame, team_dim: DataFrame) -> DataFrame:
-    monthly = metrics.groupBy(
-        F.trunc("date", "month").alias("month_start_date"),
+    daily_team_app = metrics.groupBy(
+        "date",
         "team_id",
         "app_name",
     ).agg(
+        F.sum("request_cnt_1d").alias("request_cnt_1d"),
+        F.sum("total_token_cnt_1d").alias("total_token_cnt_1d"),
+        F.sum("estimated_cost_amt_1d").alias("llm_cost_amt_1d"),
+        F.max("agent_run_cnt_1d").alias("agent_run_cnt_1d"),
+        F.max("agent_cost_amt_1d").alias("agent_cost_amt_1d"),
+    )
+    monthly = daily_team_app.groupBy(
+        F.trunc("date", "month").alias("month_start_date"),
+        "team_id",
+    ).agg(
         F.sum("request_cnt_1d").alias("request_cnt_1m"),
         F.sum("total_token_cnt_1d").alias("total_token_cnt_1m"),
-        F.sum("estimated_cost_amt_1d").alias("llm_cost_amt_1m"),
+        F.sum("llm_cost_amt_1d").alias("llm_cost_amt_1m"),
         F.sum("agent_run_cnt_1d").alias("agent_run_cnt_1m"),
         F.sum("agent_cost_amt_1d").alias("agent_cost_amt_1m"),
     )
@@ -48,7 +58,10 @@ def build_cost_monthly_chargeback(metrics: DataFrame, team_dim: DataFrame) -> Da
                 4,
             ),
         )
-        .withColumn("is_budget_overrun", F.col("chargeback_amt_1m") > F.col("budget_monthly_amt"))
+        .withColumn(
+            "is_budget_overrun",
+            F.coalesce(F.col("chargeback_amt_1m") > F.col("budget_monthly_amt"), F.lit(False)),
+        )
         .drop("budget_monthly_usd")
         .select(
             "month_start_date",
@@ -56,7 +69,6 @@ def build_cost_monthly_chargeback(metrics: DataFrame, team_dim: DataFrame) -> Da
             "team_name",
             "department",
             "cost_center",
-            "app_name",
             "request_cnt_1m",
             "total_token_cnt_1m",
             "llm_cost_amt_1m",

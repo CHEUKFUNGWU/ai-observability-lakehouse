@@ -1115,7 +1115,6 @@ CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_monthly_charg
     team_name VARCHAR(256) NULL,
     department VARCHAR(256) NULL,
     cost_center VARCHAR(128) NULL,
-    app_name VARCHAR(256) NOT NULL,
     request_cnt_1m BIGINT NOT NULL,
     total_token_cnt_1m BIGINT NOT NULL,
     llm_cost_amt_1m DOUBLE NOT NULL,
@@ -1127,9 +1126,9 @@ CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_monthly_charg
     budget_utilization_rate_1m DOUBLE NULL,
     is_budget_overrun BOOLEAN NOT NULL
 )
-DUPLICATE KEY(month_start_date, team_id, app_name)
+DUPLICATE KEY(month_start_date, team_id)
 PARTITION BY RANGE(month_start_date) ()
-DISTRIBUTED BY HASH(team_id, app_name) BUCKETS 4
+DISTRIBUTED BY HASH(team_id) BUCKETS 4
 PROPERTIES (
     "replication_num" = "1",
     "dynamic_partition.enable" = "true",

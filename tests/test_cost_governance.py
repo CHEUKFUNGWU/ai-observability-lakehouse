@@ -150,9 +150,20 @@ def test_build_cost_monthly_chargeback_computes_finance_totals(spark):
                 "agent_cost_amt_1d": 5.0,
             },
             {
-                "date": date(2026, 1, 15),
+                "date": date(2026, 1, 1),
                 "team_id": "team_support",
                 "app_name": "ai_support_bot",
+                "model_name": "gpt-4.1-mini",
+                "request_cnt_1d": 5,
+                "total_token_cnt_1d": 500,
+                "estimated_cost_amt_1d": 5.0,
+                "agent_run_cnt_1d": 2,
+                "agent_cost_amt_1d": 5.0,
+            },
+            {
+                "date": date(2026, 1, 15),
+                "team_id": "team_support",
+                "app_name": "internal_copilot",
                 "model_name": "deepseek-chat",
                 "request_cnt_1d": 20,
                 "total_token_cnt_1d": 2000,
@@ -177,12 +188,12 @@ def test_build_cost_monthly_chargeback_computes_finance_totals(spark):
     row = build_cost_monthly_chargeback(metrics, team_dim).collect()[0]
 
     assert row["month_start_date"] == date(2026, 1, 1)
-    assert row["request_cnt_1m"] == 30
-    assert row["total_token_cnt_1m"] == 3000
-    assert row["llm_cost_amt_1m"] == 40.0
+    assert row["request_cnt_1m"] == 35
+    assert row["total_token_cnt_1m"] == 3500
+    assert row["llm_cost_amt_1m"] == 45.0
     assert row["agent_run_cnt_1m"] == 5
     assert row["agent_cost_amt_1m"] == 15.0
-    assert row["chargeback_amt_1m"] == 55.0
-    assert row["budget_variance_amt_1m"] == 45.0
-    assert row["budget_utilization_rate_1m"] == 0.55
+    assert row["chargeback_amt_1m"] == 60.0
+    assert row["budget_variance_amt_1m"] == 40.0
+    assert row["budget_utilization_rate_1m"] == 0.6
     assert row["is_budget_overrun"] is False

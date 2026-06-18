@@ -470,7 +470,7 @@ Tier 2 starts with cost-governance tables:
 | `dim_user_df` | One row per user snapshot | User-to-team mapping and AI access tier |
 | `dws_ai_cost_team_request_1d` | One daily row per team, app and model | Team-attributed request count, token count, estimated LLM cost and Agent cost |
 | `ads_observability_cost_daily_budget` | One daily row per team and app | MTD cost, projected month-end spend, budget utilization and breach flag |
-| `ads_observability_cost_monthly_chargeback` | One monthly row per team, cost center and app | Finance chargeback amount, monthly budget variance and overrun flag |
+| `ads_observability_cost_monthly_chargeback` | One monthly row per team and cost center | Finance chargeback amount, monthly budget variance and overrun flag |
 | `dwd_ai_evaluation_judgment_di` | One row per evaluation judgment | LLM-as-judge, human, ground-truth or classifier score for a request/run |
 | `dws_ai_evaluation_feature_judgment_1d` | One daily row per app, feature, evaluation dimension and evaluated model | Evaluation volume, pass/fail counts, average score, p10 score and evaluation latency |
 | `dim_prompt_version_df` | One row per prompt version snapshot | Prompt metadata, owner team, release status and A/B group |
