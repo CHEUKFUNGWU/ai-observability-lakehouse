@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+wait_for_superset() {
+  local retries=60
+  until curl -fsS http://localhost:8088/health >/dev/null 2>&1; do
+    retries=$((retries - 1))
+    if (( retries == 0 )); then
+      echo "Superset health endpoint did not become ready in time." >&2
+      return 1
+    fi
+    sleep 2
+  done
+}
+
+echo "Waiting for Superset to become ready..."
+wait_for_superset
+
+echo "Upgrading Superset metadata database..."
+docker compose exec -T superset superset db upgrade
+
+echo "Creating admin user..."
+docker compose exec -T superset superset fab create-admin \
+  --username admin \
+  --firstname Admin \
+  --lastname User \
+  --email admin@local.dev \
+  --password admin || true
+
+echo "Initializing Superset..."
+docker compose exec -T superset superset init
+
+echo "Registering Doris database connection..."
+docker compose exec -T superset python3 -c "
+from superset.app import create_app
+from superset.extensions import db
+from superset.models.core import Database
+
+app = create_app()
+with app.app_context():
+    existing = db.session.query(Database).filter_by(
+        database_name='AI Observability (Doris)'
+    ).first()
+    if not existing:
+        doris_db = Database(
+            database_name='AI Observability (Doris)',
+            sqlalchemy_uri='mysql://root:@doris-fe:9030/ai_observability',
+            expose_in_sqllab=True,
+            allow_run_async=True,
+        )
+        db.session.add(doris_db)
+        db.session.commit()
+        print('Doris database registered.')
+    else:
+        print('Doris database already registered.')
+"
+
+for dashboard_file in config/superset/dashboards/*.json; do
+  if [[ -f "${dashboard_file}" ]]; then
+    echo "Importing dashboard: ${dashboard_file}"
+    docker compose exec -T superset superset import-dashboards \
+      -p "/app/${dashboard_file}" || true
+  fi
+done
+
+echo "Superset initialization complete."
+echo "Open http://localhost:8088 (admin / admin)"

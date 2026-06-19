@@ -158,6 +158,52 @@ services:
     depends_on:
       - doris-fe
       - doris-be
+
+  superset-metadata:
+    image: postgres:16
+    container_name: ai-observability-superset-db
+    environment:
+      POSTGRES_DB: superset
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+    volumes:
+      - superset_metadata:/var/lib/postgresql/data
+
+  superset-redis:
+    image: redis:7-alpine
+    container_name: ai-observability-superset-redis
+
+  superset:
+    image: apache/superset:4.1.1
+    container_name: ai-observability-superset
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: "ai-observability-local-dev-secret-key"
+      SQLALCHEMY_DATABASE_URI: "postgresql://superset:superset@superset-metadata:5432/superset"
+      REDIS_URL: "redis://superset-redis:6379/0"
+      SUPERSET_LOAD_EXAMPLES: "no"
+    volumes:
+      - superset_home:/app/superset_home
+      - ./config/superset:/app/config/superset:ro
+      - ./scripts:/app/bootstrap-scripts:ro
+    depends_on:
+      - superset-metadata
+      - superset-redis
+      - doris-fe
+
+  grafana:
+    image: grafana/grafana-oss:11.6.0
+    container_name: ai-observability-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_INSTALL_PLUGINS: ""
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
   
 volumes:
   postgres_data:
@@ -165,3 +211,6 @@ volumes:
   doris_fe_data:
   doris_be_data:
   kafka_data:
+  superset_metadata:
+  superset_home:
+  grafana_data:

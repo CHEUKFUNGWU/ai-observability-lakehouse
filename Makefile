@@ -1,4 +1,4 @@
-.PHONY: test lint pipeline infra-light infra-serving infra-stop seed-data flink-up flink-submit flink-jobs flink-savepoint flink-cancel flink-restore batch-backfill sync-doris health demo demo-streaming demo-serving clean
+.PHONY: test lint pipeline infra-light infra-serving infra-dashboard infra-stop init-superset dashboard-stop seed-data flink-up flink-submit flink-jobs flink-savepoint flink-cancel flink-restore batch-backfill sync-doris health demo demo-streaming demo-serving clean
 
 test:
 	uv run pytest -v
@@ -16,6 +16,15 @@ infra-light:
 
 infra-serving:
 	docker compose up -d doris-fe doris-be doris-init
+
+infra-dashboard:
+	docker compose up -d superset-metadata superset-redis superset grafana
+
+init-superset:
+	scripts/init_superset.sh
+
+dashboard-stop:
+	docker compose stop superset superset-metadata superset-redis grafana
 
 infra-stop:
 	docker compose stop

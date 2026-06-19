@@ -39,6 +39,8 @@ require_running_service flink-taskmanager
 if [[ "${skip_serving}" == false ]]; then
   require_running_service doris-fe
   require_running_service doris-be
+  require_running_service superset
+  require_running_service grafana
 fi
 
 topics="$(
@@ -133,6 +135,18 @@ if [[ "${skip_serving}" == false ]]; then
     pass "Doris FE query endpoint is reachable"
   else
     fail "Doris FE query endpoint is not reachable"
+  fi
+
+  if curl -fsS http://localhost:8088/health >/dev/null 2>&1; then
+    pass "Superset health endpoint is reachable"
+  else
+    fail "Superset health endpoint is not reachable"
+  fi
+
+  if curl -fsS http://localhost:3001/api/health >/dev/null 2>&1; then
+    pass "Grafana health endpoint is reachable"
+  else
+    fail "Grafana health endpoint is not reachable"
   fi
 fi
 
