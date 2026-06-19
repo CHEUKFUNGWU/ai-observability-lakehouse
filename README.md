@@ -479,6 +479,5 @@ It combines practical AI engineering and data engineering:
 ## 14. Future Roadmap
 
 - Superset, Grafana or a custom dashboard application
-- Tier 2 enterprise governance beyond cost budgets, evaluation, prompt metrics and model deployment events
 - Additional dimensions for agents
-- Tier 3 compliance, multi-agent orchestration and platform-health facts
+- Production source integrations for enterprise compliance systems and platform APIs

@@ -1,5 +1,45 @@
 from pathlib import Path
 
+from app.warehouse_contract import (
+    render_agent_team_run_1d_flink_columns,
+    render_agent_orchestration_flink_columns,
+    render_agent_orchestration_flink_select,
+    render_agent_orchestration_handoff_1d_flink_columns,
+    render_agent_orchestration_where_clause,
+    render_compliance_access_audit_flink_columns,
+    render_compliance_access_audit_flink_select,
+    render_compliance_access_audit_where_clause,
+    render_cost_team_request_1d_flink_columns,
+    render_compliance_data_retention_flink_columns,
+    render_compliance_data_retention_flink_select,
+    render_compliance_data_retention_where_clause,
+    render_evaluation_feature_judgment_1d_flink_columns,
+    render_evaluation_judgment_flink_columns,
+    render_evaluation_judgment_flink_select,
+    render_evaluation_judgment_where_clause,
+    render_feedback_action_flink_columns,
+    render_feedback_action_flink_select,
+    render_feedback_action_where_clause,
+    render_feedback_feature_action_1d_flink_columns,
+    render_guardrail_check_flink_columns,
+    render_guardrail_check_flink_select,
+    render_guardrail_check_where_clause,
+    render_guardrail_rule_check_1d_flink_columns,
+    render_llm_feature_env_request_1d_flink_columns,
+    render_llm_feature_request_1h_flink_columns,
+    render_llm_request_flink_columns,
+    render_llm_request_flink_select,
+    render_llm_request_paimon_bootstrap,
+    render_llm_request_where_clause,
+    render_llm_region_request_1d_flink_columns,
+    render_llm_session_request_1d_flink_columns,
+    render_prompt_version_request_1d_flink_columns,
+    render_retrieval_knowledge_base_request_1d_flink_columns,
+    render_retrieval_request_flink_columns,
+    render_retrieval_request_flink_select,
+    render_retrieval_request_where_clause,
+    render_platform_component_health_1d_flink_columns,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FLINK_SQL_DIR = REPO_ROOT / "flink" / "sql"
@@ -63,27 +103,57 @@ def test_paimon_layers_use_expected_tables():
     assert "ods_ai_observability_guardrail_events_di" in ods_sql
     assert "ods_ai_observability_evaluation_events_di" in ods_sql
     assert "ods_ai_observability_model_deployment_events_di" in ods_sql
+    assert "ods_ai_observability_compliance_access_audit_events_di" in ods_sql
+    assert "ods_ai_observability_compliance_data_retention_events_di" in ods_sql
+    assert "ods_ai_observability_agent_orchestration_events_di" in ods_sql
+    assert "ods_ai_observability_platform_health_metrics_di" in ods_sql
     assert "'connector' = 'upsert-kafka'" in ods_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in ods_sql
     assert "paimon_lake.dwd.dwd_ai_llm_request_di" in dwd_sql
     assert "paimon_lake.dwd.dwd_ai_retrieval_request_di" in dwd_sql
+    assert render_retrieval_request_flink_columns() in dwd_sql
     assert "paimon_lake.dwd.dwd_ai_feedback_action_di" in dwd_sql
+    assert render_feedback_action_flink_columns() in dwd_sql
     assert "paimon_lake.dwd.dwd_ai_guardrail_check_di" in dwd_sql
+    assert render_guardrail_check_flink_columns() in dwd_sql
     assert "paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in dwd_sql
+    assert render_evaluation_judgment_flink_columns() in dwd_sql
     assert "paimon_lake.dwd.dwd_ai_model_deployment_di" in dwd_sql
+    assert "paimon_lake.dwd.dwd_ai_compliance_access_audit_di" in dwd_sql
+    assert render_compliance_access_audit_flink_columns() in dwd_sql
+    assert "paimon_lake.dwd.dwd_ai_compliance_data_retention_di" in dwd_sql
+    assert render_compliance_data_retention_flink_columns() in dwd_sql
+    assert "paimon_lake.dwd.dwd_ai_agent_orchestration_di" in dwd_sql
+    assert render_agent_orchestration_flink_columns() in dwd_sql
     assert "WATERMARK FOR created_at AS created_at - INTERVAL '5' SECOND" in dwd_sql
+    assert render_llm_request_flink_columns() in dwd_sql
     assert "paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
     assert "paimon_lake.dws.dws_ai_llm_feature_request_1h" in dws_sql
     assert "paimon_lake.dws.dws_ai_llm_session_request_1d" in dws_sql
     assert "paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d" in dws_sql
+    assert render_retrieval_knowledge_base_request_1d_flink_columns() in dws_sql
     assert "paimon_lake.dws.dws_ai_feedback_feature_action_1d" in dws_sql
+    assert render_feedback_feature_action_1d_flink_columns() in dws_sql
     assert "paimon_lake.dws.dws_ai_guardrail_rule_check_1d" in dws_sql
+    assert render_guardrail_rule_check_1d_flink_columns() in dws_sql
     assert "paimon_lake.dws.dws_ai_cost_team_request_1d" in dws_sql
+    assert render_cost_team_request_1d_flink_columns() in dws_sql
     assert "paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d" in dws_sql
+    assert render_evaluation_feature_judgment_1d_flink_columns() in dws_sql
     assert "paimon_lake.dws.dws_ai_prompt_version_request_1d" in dws_sql
+    assert render_prompt_version_request_1d_flink_columns() in dws_sql
     assert "paimon_lake.dws.dws_ai_llm_feature_env_request_1d" in dws_sql
+    assert render_llm_feature_env_request_1d_flink_columns() in dws_sql
     assert "paimon_lake.dws.dws_ai_llm_region_request_1d" in dws_sql
+    assert render_llm_region_request_1d_flink_columns() in dws_sql
     assert "paimon_lake.dws.dws_ai_agent_team_run_1d" in dws_sql
+    assert render_agent_team_run_1d_flink_columns() in dws_sql
+    assert "paimon_lake.dws.dws_ai_agent_orchestration_handoff_1d" in dws_sql
+    assert render_agent_orchestration_handoff_1d_flink_columns() in dws_sql
+    assert "paimon_lake.dws.dws_ai_platform_component_health_1d" in dws_sql
+    assert render_platform_component_health_1d_flink_columns() in dws_sql
+    assert render_llm_feature_request_1h_flink_columns() in dws_sql
+    assert render_llm_session_request_1d_flink_columns() in dws_sql
     assert "PRIMARY KEY (request_id) NOT ENFORCED" in dwd_sql
     assert "PARTITIONED BY (`date`)" in dws_sql
 
@@ -98,15 +168,38 @@ def test_flink_sql_layer_dependencies_are_explicit():
     assert "INSERT INTO paimon_lake.dwd.dwd_ai_llm_request_di" in dwd_sql
     assert "INSERT INTO paimon_lake.dwd.dwd_ai_retrieval_request_di" in dwd_sql
     assert "INSERT INTO paimon_lake.dwd.dwd_ai_feedback_action_di" in dwd_sql
+    assert render_feedback_action_flink_select() in dwd_sql
+    assert render_feedback_action_where_clause() in dwd_sql
     assert "INSERT INTO paimon_lake.dwd.dwd_ai_guardrail_check_di" in dwd_sql
+    assert render_guardrail_check_flink_select() in dwd_sql
+    assert render_guardrail_check_where_clause() in dwd_sql
     assert "INSERT INTO paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in dwd_sql
+    assert render_evaluation_judgment_flink_select() in dwd_sql
+    assert render_evaluation_judgment_where_clause() in dwd_sql
     assert "INSERT INTO paimon_lake.dwd.dwd_ai_model_deployment_di" in dwd_sql
+    assert "INSERT INTO paimon_lake.dwd.dwd_ai_compliance_access_audit_di" in dwd_sql
+    assert render_compliance_access_audit_flink_select() in dwd_sql
+    assert render_compliance_access_audit_where_clause() in dwd_sql
+    assert "INSERT INTO paimon_lake.dwd.dwd_ai_compliance_data_retention_di" in dwd_sql
+    assert render_compliance_data_retention_flink_select() in dwd_sql
+    assert render_compliance_data_retention_where_clause() in dwd_sql
+    assert "INSERT INTO paimon_lake.dwd.dwd_ai_agent_orchestration_di" in dwd_sql
+    assert render_agent_orchestration_flink_select() in dwd_sql
+    assert render_agent_orchestration_where_clause() in dwd_sql
     assert "FROM ods_ai_observability_llm_request_events_di" in dwd_sql
+    assert render_llm_request_flink_select() in dwd_sql
+    assert render_llm_request_where_clause() in dwd_sql
     assert "FROM ods_ai_observability_retrieval_events_di" in dwd_sql
+    assert render_retrieval_request_flink_select() in dwd_sql
+    assert render_retrieval_request_where_clause() in dwd_sql
     assert "FROM ods_ai_observability_feedback_events_di" in dwd_sql
     assert "FROM ods_ai_observability_guardrail_events_di" in dwd_sql
     assert "FROM ods_ai_observability_evaluation_events_di" in dwd_sql
     assert "FROM ods_ai_observability_model_deployment_events_di" in dwd_sql
+    assert "FROM ods_ai_observability_compliance_access_audit_events_di" in dwd_sql
+    assert "FROM ods_ai_observability_compliance_data_retention_events_di" in dwd_sql
+    assert "FROM ods_ai_observability_agent_orchestration_events_di" in dwd_sql
+    assert "CHAR_LENGTH(ip_address) = 64" in dwd_sql
     assert "request_id IS NOT NULL" in dwd_sql
     assert "created_at IS NOT NULL" in dwd_sql
     assert "prompt_tokens >= 0" in dwd_sql
@@ -123,8 +216,14 @@ def test_flink_sql_layer_dependencies_are_explicit():
     assert "INSERT INTO paimon_lake.dws.dws_ai_feedback_feature_action_1d" in dws_sql
     assert "INSERT INTO paimon_lake.dws.dws_ai_guardrail_rule_check_1d" in dws_sql
     assert "INSERT INTO paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d" in dws_sql
+    assert "AVG(score) AS avg_score" in dws_sql
+    assert "MIN(score) AS p10_score" in dws_sql
     assert "INSERT INTO paimon_lake.dws.dws_ai_llm_feature_env_request_1d" in dws_sql
     assert "INSERT INTO paimon_lake.dws.dws_ai_llm_region_request_1d" in dws_sql
+    assert "INSERT INTO paimon_lake.dws.dws_ai_agent_orchestration_handoff_1d" in dws_sql
+    assert "CAST(MAX(handoff_latency_ms) AS BIGINT) AS p95_handoff_latency_ms" in dws_sql
+    assert "INSERT INTO paimon_lake.dws.dws_ai_platform_component_health_1d" in dws_sql
+    assert "MAX(metric_value) > MAX(threshold) AS is_breach" in dws_sql
     assert "FROM paimon_lake.dwd.dwd_ai_llm_request_di" in dws_sql
     assert "FROM paimon_lake.dws.dws_ai_llm_feature_request_1h" in dws_sql
     assert "TUMBLE(" in dws_sql
@@ -146,6 +245,9 @@ def test_flink_verify_sql_covers_dwd_and_dws_layers():
     assert "COUNT(*) AS dwd_guardrail_row_count" in dwd_sql
     assert "COUNT(*) AS dwd_evaluation_row_count" in dwd_sql
     assert "COUNT(*) AS dwd_model_deployment_row_count" in dwd_sql
+    assert "COUNT(*) AS dwd_compliance_access_audit_row_count" in dwd_sql
+    assert "COUNT(*) AS dwd_compliance_data_retention_row_count" in dwd_sql
+    assert "COUNT(*) AS dwd_agent_orchestration_row_count" in dwd_sql
     assert "FROM paimon_lake.dwd.dwd_ai_llm_request_di" in dwd_sql
     assert "SET 'execution.runtime-mode' = 'batch'" in dws_sql
     assert "COUNT(*) AS dws_metric_rows" in dws_sql
@@ -160,6 +262,8 @@ def test_flink_verify_sql_covers_dwd_and_dws_layers():
     assert "COUNT(*) AS dws_agent_team_metric_rows" in dws_sql
     assert "COUNT(*) AS dws_llm_feature_hourly_metric_rows" in dws_sql
     assert "COUNT(*) AS dws_llm_session_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_agent_orchestration_metric_rows" in dws_sql
+    assert "COUNT(*) AS dws_platform_health_metric_rows" in dws_sql
     assert "SUM(request_count) AS total_request_count" in dws_sql
     assert "FROM paimon_lake.dws.dws_ai_llm_feature_request_1d" in dws_sql
 
@@ -171,7 +275,8 @@ def test_spark_paimon_table_bootstrap_matches_flink_keyed_tables():
     assert "'primary-key' = 'date,app_name,feature_name,model_name'" in script
     assert "'bucket' = '-1'" in script
     assert "'bucket' = '4'" in script
-    assert "max_latency_ms BIGINT" in script
+    assert "render_llm_request_paimon_bootstrap" in script
+    assert render_llm_request_paimon_bootstrap() not in script
 
 
 def test_postgres_source_schema_matches_cdc_source_table():
@@ -276,12 +381,19 @@ def test_light_and_serving_demo_commands_are_split():
     assert "ods_ai_observability_guardrail_events_di" in health_script
     assert "ods_ai_observability_evaluation_events_di" in health_script
     assert "ods_ai_observability_model_deployment_events_di" in health_script
+    assert "ods_ai_observability_compliance_access_audit_events_di" in health_script
+    assert "ods_ai_observability_compliance_data_retention_events_di" in health_script
+    assert "ods_ai_observability_agent_orchestration_events_di" in health_script
+    assert "ods_ai_observability_platform_health_metrics_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_llm_request_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_retrieval_request_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_feedback_action_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_guardrail_check_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_evaluation_judgment_di" in health_script
     assert "insert-into_paimon_lake.dwd.dwd_ai_model_deployment_di" in health_script
+    assert "insert-into_paimon_lake.dwd.dwd_ai_compliance_access_audit_di" in health_script
+    assert "insert-into_paimon_lake.dwd.dwd_ai_compliance_data_retention_di" in health_script
+    assert "insert-into_paimon_lake.dwd.dwd_ai_agent_orchestration_di" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1d" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_feedback_feature_action_1d" in health_script
@@ -289,6 +401,8 @@ def test_light_and_serving_demo_commands_are_split():
     assert "insert-into_paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1h" in health_script
     assert "insert-into_paimon_lake.dws.dws_ai_llm_session_request_1d" in health_script
+    assert "insert-into_paimon_lake.dws.dws_ai_agent_orchestration_handoff_1d" in health_script
+    assert "insert-into_paimon_lake.dws.dws_ai_platform_component_health_1d" in health_script
 
 
 def test_flink_warehouse_prepare_script_creates_checkpoint_dirs():

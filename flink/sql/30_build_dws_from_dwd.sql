@@ -156,6 +156,35 @@ SELECT
 FROM paimon_lake.dwd.dwd_ai_llm_request_di
 GROUP BY `date`, region, environment, app_name, model_name;
 
+INSERT INTO paimon_lake.dws.dws_ai_agent_orchestration_handoff_1d
+SELECT
+    `date`,
+    parent_agent_id,
+    child_agent_id,
+    handoff_type,
+    COUNT(*) AS handoff_cnt_1d,
+    SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_cnt_1d,
+    SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_cnt_1d,
+    SUM(CASE WHEN status = 'timeout' THEN 1 ELSE 0 END) AS timeout_cnt_1d,
+    AVG(CAST(handoff_latency_ms AS DOUBLE)) AS avg_handoff_latency_ms,
+    CAST(MAX(handoff_latency_ms) AS BIGINT) AS p95_handoff_latency_ms
+FROM paimon_lake.dwd.dwd_ai_agent_orchestration_di
+GROUP BY `date`, parent_agent_id, child_agent_id, handoff_type;
+
+INSERT INTO paimon_lake.dws.dws_ai_platform_component_health_1d
+SELECT
+    `date`,
+    component,
+    metric_name,
+    MAX(metric_value) AS metric_value,
+    MAX(threshold) AS threshold,
+    MAX(metric_value) > MAX(threshold) AS is_breach
+FROM ods_ai_observability_platform_health_metrics_di
+WHERE component IN ('kafka', 'flink', 'paimon', 'doris')
+  AND metric_value >= 0
+  AND threshold >= 0
+GROUP BY `date`, component, metric_name;
+
 INSERT INTO paimon_lake.dws.dws_ai_llm_session_request_1d
 WITH session_metrics AS (
     SELECT

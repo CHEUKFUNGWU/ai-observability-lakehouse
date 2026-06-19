@@ -138,6 +138,7 @@ The health check verifies:
 - Flink REST API is reachable.
 - DWD and DWS streaming jobs are running.
 - Hourly feature and daily session DWS jobs are running.
+- Tier 3 compliance, orchestration and platform-health topics and jobs are running.
 - Doris FE is queryable when serving checks are enabled.
 
 This is a fast operational check. It does not replace deeper table-level
@@ -145,6 +146,16 @@ verification queries such as `flink/sql/91_verify_dwd_count.sql` and
 `flink/sql/92_verify_dws_metrics.sql`.
 
 The hourly feature job uses a five-second event-time watermark and a one-hour tumble window. The session job resolves sessions from positive feedback (`thumbs_up` or rating >= 4).
+
+Generate deterministic Tier 3 source fixtures:
+
+```bash
+uv run python -m scripts.generate_mock_compliance_logs --count 100 --seed 42
+uv run python -m scripts.generate_mock_orchestration_logs --count 100 --seed 42
+uv run python -m scripts.generate_mock_platform_health_logs --sample-count 12 --seed 42
+```
+
+Platform thresholds are managed in `config/platform_health_thresholds.yaml`. All current metrics are upper-bound thresholds. The daily DWS retains the maximum observed value and marks a breach when that maximum exceeds the configured threshold.
 
 Build and load the executive weekly summary after the daily DWS Parquet outputs are available:
 

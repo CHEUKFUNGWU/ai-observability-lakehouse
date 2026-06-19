@@ -2,9 +2,9 @@ import argparse
 from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
+from app.warehouse_contract import build_evaluation_judgment_projection
 from scripts.spark_utils import build_spark_session
 
 
@@ -18,33 +18,7 @@ def load_ods_events(spark: SparkSession, input_path: Path) -> DataFrame:
 
 
 def transform_evaluation_events(raw_events: DataFrame) -> DataFrame:
-    source_columns = set(raw_events.columns)
-
-    def event_col(name: str, default):
-        return F.col(name) if name in source_columns else F.lit(default)
-
-    return raw_events.select(
-        F.col("evaluation_id").cast("string").alias("evaluation_id"),
-        event_col("trace_id", "").cast("string").alias("trace_id"),
-        event_col("request_id", "").cast("string").alias("request_id"),
-        event_col("run_id", "").cast("string").alias("run_id"),
-        F.col("app_name").cast("string").alias("app_name"),
-        F.col("feature_name").cast("string").alias("feature_name"),
-        F.col("evaluator_type").cast("string").alias("evaluator_type"),
-        event_col("evaluator_model", "").cast("string").alias("evaluator_model"),
-        F.col("evaluation_dimension").cast("string").alias("evaluation_dimension"),
-        F.col("score").cast("double").alias("score"),
-        event_col("raw_score", "").cast("string").alias("raw_score"),
-        F.col("pass_threshold").cast("double").alias("pass_threshold"),
-        F.col("passed").cast("boolean").alias("passed"),
-        F.col("evaluated_model_name").cast("string").alias("evaluated_model_name"),
-        F.col("evaluated_prompt_version").cast("string").alias("evaluated_prompt_version"),
-        F.col("evaluation_latency_ms").cast("int").alias("evaluation_latency_ms"),
-        F.col("mode").cast("string").alias("mode"),
-        F.col("environment").cast("string").alias("environment"),
-        F.to_timestamp("created_at").alias("created_at"),
-        F.to_date("date").alias("date"),
-    )
+    return build_evaluation_judgment_projection(raw_events)
 
 
 def write_parquet(events: DataFrame, output_path: Path) -> None:

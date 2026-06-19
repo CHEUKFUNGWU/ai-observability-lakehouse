@@ -1,22 +1,9 @@
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
+from app.warehouse_contract import llm_request_validation_rules
 
-VALIDATION_RULES: list[tuple[str, str, str]] = [
-    ("request_id IS NOT NULL", "completeness", "missing_request_id"),
-    ("created_at IS NOT NULL", "completeness", "missing_created_at"),
-    ("prompt_tokens >= 0", "validity", "negative_prompt_tokens"),
-    ("completion_tokens >= 0", "validity", "negative_completion_tokens"),
-    (
-        "total_tokens = prompt_tokens + completion_tokens",
-        "consistency",
-        "token_total_mismatch",
-    ),
-    ("latency_ms > 0", "validity", "non_positive_latency"),
-    ("status IN ('success', 'error')", "validity", "invalid_status"),
-    ("estimated_cost_usd >= 0", "validity", "negative_cost"),
-    ("mode IN ('mock', 'live', 'replay', 'hermes')", "validity", "invalid_mode"),
-]
+VALIDATION_RULES: list[tuple[str, str, str]] = llm_request_validation_rules()
 
 
 def validate_llm_events(df: DataFrame) -> DataFrame:

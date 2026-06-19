@@ -18,3 +18,12 @@ FROM paimon_lake.dwd.dwd_ai_evaluation_judgment_di;
 
 SELECT COUNT(*) AS dwd_model_deployment_row_count
 FROM paimon_lake.dwd.dwd_ai_model_deployment_di;
+
+SELECT COUNT(*) AS dwd_compliance_access_audit_row_count
+FROM paimon_lake.dwd.dwd_ai_compliance_access_audit_di;
+
+SELECT COUNT(*) AS dwd_compliance_data_retention_row_count
+FROM paimon_lake.dwd.dwd_ai_compliance_data_retention_di;
+
+SELECT COUNT(*) AS dwd_agent_orchestration_row_count
+FROM paimon_lake.dwd.dwd_ai_agent_orchestration_di;

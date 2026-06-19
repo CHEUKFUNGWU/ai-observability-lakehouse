@@ -4,6 +4,7 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from app.warehouse_contract import build_llm_region_request_1d_projection
 from app.logging_utils import get_logger, log_info
 from scripts.spark_utils import build_spark_session
 
@@ -18,17 +19,19 @@ def load_dwd_events(spark: SparkSession, input_path: Path) -> DataFrame:
 
 
 def build_llm_region_daily_metrics(events: DataFrame) -> DataFrame:
-    return events.groupBy("date", "region", "environment", "app_name", "model_name").agg(
-        F.count("*").alias("request_cnt_1d"),
-        F.sum(F.when(F.col("status") == "success", 1).otherwise(0)).alias("success_cnt_1d"),
-        F.sum(F.when(F.col("status") == "error", 1).otherwise(0)).alias("error_cnt_1d"),
-        F.sum("prompt_tokens").alias("prompt_token_cnt_1d"),
-        F.sum("completion_tokens").alias("completion_token_cnt_1d"),
-        F.sum("total_tokens").alias("total_token_cnt_1d"),
-        F.sum("estimated_cost_usd").alias("estimated_cost_amt_1d"),
-        F.round(F.avg("latency_ms"), 2).alias("avg_latency_ms"),
-        F.max("latency_ms").alias("max_latency_ms"),
-        F.expr("percentile_approx(latency_ms, 0.95)").alias("p95_latency_ms"),
+    return build_llm_region_request_1d_projection(
+        events.groupBy("date", "region", "environment", "app_name", "model_name").agg(
+            F.count("*").alias("request_cnt_1d"),
+            F.sum(F.when(F.col("status") == "success", 1).otherwise(0)).alias("success_cnt_1d"),
+            F.sum(F.when(F.col("status") == "error", 1).otherwise(0)).alias("error_cnt_1d"),
+            F.sum("prompt_tokens").alias("prompt_token_cnt_1d"),
+            F.sum("completion_tokens").alias("completion_token_cnt_1d"),
+            F.sum("total_tokens").alias("total_token_cnt_1d"),
+            F.sum("estimated_cost_usd").alias("estimated_cost_amt_1d"),
+            F.round(F.avg("latency_ms"), 2).alias("avg_latency_ms"),
+            F.max("latency_ms").alias("max_latency_ms"),
+            F.expr("percentile_approx(latency_ms, 0.95)").alias("p95_latency_ms"),
+        )
     )
 
 

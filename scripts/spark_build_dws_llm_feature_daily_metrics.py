@@ -5,6 +5,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
+from app.warehouse_contract import build_llm_feature_request_1d_projection
 from scripts.spark_utils import build_spark_session
 
 
@@ -18,17 +19,19 @@ def load_dwd_events(spark: SparkSession, input_path: Path) -> DataFrame:
 
 
 def build_feature_daily_metrics(events: DataFrame) -> DataFrame:
-    return events.groupBy("date", "app_name", "feature_name", "model_name").agg(
-        F.count("*").alias("request_count"),
-        F.sum(F.when(F.col("status") == "success", 1).otherwise(0)).alias("success_count"),
-        F.sum(F.when(F.col("status") == "error", 1).otherwise(0)).alias("error_count"),
-        F.sum("prompt_tokens").alias("prompt_tokens"),
-        F.sum("completion_tokens").alias("completion_tokens"),
-        F.sum("total_tokens").alias("total_tokens"),
-        F.sum("estimated_cost_usd").alias("estimated_cost_usd"),
-        F.round(F.avg("latency_ms"), 2).alias("avg_latency_ms"),
-        F.max("latency_ms").alias("max_latency_ms"),
-        F.expr("percentile_approx(latency_ms, 0.95)").alias("p95_latency_ms"),
+    return build_llm_feature_request_1d_projection(
+        events.groupBy("date", "app_name", "feature_name", "model_name").agg(
+            F.count("*").alias("request_count"),
+            F.sum(F.when(F.col("status") == "success", 1).otherwise(0)).alias("success_count"),
+            F.sum(F.when(F.col("status") == "error", 1).otherwise(0)).alias("error_count"),
+            F.sum("prompt_tokens").alias("prompt_tokens"),
+            F.sum("completion_tokens").alias("completion_tokens"),
+            F.sum("total_tokens").alias("total_tokens"),
+            F.sum("estimated_cost_usd").alias("estimated_cost_usd"),
+            F.round(F.avg("latency_ms"), 2).alias("avg_latency_ms"),
+            F.max("latency_ms").alias("max_latency_ms"),
+            F.expr("percentile_approx(latency_ms, 0.95)").alias("p95_latency_ms"),
+        )
     )
 
 

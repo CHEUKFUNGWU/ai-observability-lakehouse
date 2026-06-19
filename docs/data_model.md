@@ -136,6 +136,11 @@ One row per provider request attempt result.
 
 Partitioned by `date`.
 
+### Contract Ownership
+
+The `llm_request` field list, default handling, and validation rules are owned by `app/warehouse_contract.py`.
+Spark projection, Spark Paimon bootstrap, and contract-oriented SQL tests should reuse that module rather than restating the contract inline.
+
 ---
 
 ## 5. DWD Table: dwd_ai_agent_run_di
@@ -400,6 +405,9 @@ Daily tool-level Agent metrics for dashboard queries. This table answers:
 | avg_result_size | double | Average result payload size |
 | max_result_size | int | Max result payload size |
 
+The core Agent run fact, Agent span fact, Agent tool-call fact, Agent daily summary, and Agent tool daily summary contracts are also owned by `app/warehouse_contract.py`.
+Spark projection and contract-oriented SQL tests should reuse that module rather than restating those field lists inline.
+
 ---
 
 ## 11. Entity Relationship
@@ -464,6 +472,18 @@ Tier 1 expands the runtime observability model beyond LLM and Agent execution:
 | `ads_observability_feedback_daily_satisfaction` | Daily satisfaction mart | Satisfaction rate, regeneration rate and breach flags |
 | `ads_observability_guardrail_daily_violation` | Daily guardrail violation mart | Trigger/block rates and policy-latency breach flags |
 
+The retrieval request fact and retrieval daily summary contracts are owned by `app/warehouse_contract.py`.
+Spark projection and contract-oriented SQL tests should reuse that module rather than restating retrieval field lists inline.
+
+The feedback action fact, guardrail check fact, feedback daily summary, and guardrail daily summary contracts are also owned by `app/warehouse_contract.py`.
+Spark projection and contract-oriented SQL tests should reuse that module rather than restating those field lists inline.
+
+The evaluation judgment fact, model deployment fact, compliance facts, agent orchestration fact, evaluation daily summary, agent orchestration daily summary, and platform health daily summary contracts are also owned by `app/warehouse_contract.py`.
+Spark projection and contract-oriented SQL tests should reuse that module rather than restating those field lists inline.
+
+The cost-team, prompt-version, feature-environment, region, agent-team, hourly feature, and session daily summaries are also owned by `app/warehouse_contract.py`.
+Spark summary builders and contract-oriented SQL tests should reuse that module rather than restating those field lists inline.
+
 Tier 2 starts with cost-governance tables:
 
 | Table | Grain | Purpose |
@@ -484,4 +504,14 @@ Tier 2 starts with cost-governance tables:
 | `dws_ai_agent_team_run_1d` | One daily row per team, app, agent and task type | Team-attributed agent run volume, success/error counts, tokens, cost, duration and span metrics |
 | `ads_observability_executive_weekly_summary` | One weekly row per app | Cross-domain LLM, Agent, retrieval, feedback, guardrail, evaluation and cost summary |
 
-Tier 1 and Tier 2 table inventory is implemented. Remaining planned extensions are Tier 3 compliance, multi-agent orchestration and platform-health facts.
+Tier 3 completes the planned compliance, multi-agent and platform-health model:
+
+| Table | Grain | Purpose |
+|---|---|---|
+| `dwd_ai_compliance_access_audit_di` | One row per access attempt | Granted and denied actions on classified AI resources, with hashed source IP |
+| `dwd_ai_compliance_data_retention_di` | One row per retention action on a table partition | Archive, anonymize and delete policy enforcement evidence |
+| `dwd_ai_agent_orchestration_di` | One row per inter-agent handoff | Parent/child run topology, handoff type, payload size, latency and outcome |
+| `dws_ai_agent_orchestration_handoff_1d` | One daily row per parent agent, child agent and handoff type | Handoff volume, outcomes, average latency and p95 latency |
+| `dws_ai_platform_component_health_1d` | One daily row per component and metric | Daily maximum observation, configured threshold and breach state |
+
+All three tiers in the domain expansion plan are implemented. Platform metrics use upper-bound thresholds; `metric_value` is the maximum observed value for the day, so `is_breach` is reproducible as `metric_value > threshold`.

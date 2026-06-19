@@ -4,6 +4,7 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from app.warehouse_contract import build_cost_team_request_1d_projection
 from app.logging_utils import get_logger, log_info
 from scripts.spark_utils import build_spark_session
 
@@ -35,20 +36,9 @@ def build_cost_team_daily_metrics(
     )
 
     if agent_runs is None:
-        return (
+        return build_cost_team_request_1d_projection(
             llm_metrics.withColumn("agent_run_cnt_1d", F.lit(0).cast("bigint"))
             .withColumn("agent_cost_amt_1d", F.lit(0.0).cast("double"))
-            .select(
-                "date",
-                "team_id",
-                "app_name",
-                "model_name",
-                "request_cnt_1d",
-                "total_token_cnt_1d",
-                "estimated_cost_amt_1d",
-                "agent_run_cnt_1d",
-                "agent_cost_amt_1d",
-            )
         )
 
     agent_joined = agent_runs.join(user_team, on="user_id", how="left").withColumn(
@@ -59,20 +49,9 @@ def build_cost_team_daily_metrics(
         F.sum("estimated_cost_usd").alias("agent_cost_amt_1d"),
     )
 
-    return (
+    return build_cost_team_request_1d_projection(
         llm_metrics.join(agent_metrics, on=["date", "team_id", "app_name"], how="left")
         .fillna({"agent_run_cnt_1d": 0, "agent_cost_amt_1d": 0.0})
-        .select(
-            "date",
-            "team_id",
-            "app_name",
-            "model_name",
-            "request_cnt_1d",
-            "total_token_cnt_1d",
-            "estimated_cost_amt_1d",
-            "agent_run_cnt_1d",
-            "agent_cost_amt_1d",
-        )
     )
 
 

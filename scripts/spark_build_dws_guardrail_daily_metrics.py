@@ -5,6 +5,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
+from app.warehouse_contract import build_guardrail_rule_check_1d_projection
 from scripts.spark_utils import build_spark_session
 
 
@@ -18,14 +19,16 @@ def load_dwd_events(spark: SparkSession, input_path: Path) -> DataFrame:
 
 
 def build_guardrail_daily_metrics(events: DataFrame) -> DataFrame:
-    return events.groupBy("date", "app_name", "rule_category", "action_taken").agg(
-        F.count("*").alias("check_cnt_1d"),
-        F.sum(F.when(F.col("triggered"), 1).otherwise(0)).alias("triggered_cnt_1d"),
-        F.sum(F.when(F.col("action_taken") == "block", 1).otherwise(0)).alias("block_cnt_1d"),
-        F.sum(F.when(F.col("action_taken") == "redact", 1).otherwise(0)).alias("redact_cnt_1d"),
-        F.sum(F.when(F.col("action_taken") == "warn", 1).otherwise(0)).alias("warn_cnt_1d"),
-        F.round(F.avg("guardrail_latency_ms"), 2).alias("avg_guardrail_latency_ms"),
-        F.countDistinct("user_id").alias("distinct_user_cnt_1d"),
+    return build_guardrail_rule_check_1d_projection(
+        events.groupBy("date", "app_name", "rule_category", "action_taken").agg(
+            F.count("*").alias("check_cnt_1d"),
+            F.sum(F.when(F.col("triggered"), 1).otherwise(0)).alias("triggered_cnt_1d"),
+            F.sum(F.when(F.col("action_taken") == "block", 1).otherwise(0)).alias("block_cnt_1d"),
+            F.sum(F.when(F.col("action_taken") == "redact", 1).otherwise(0)).alias("redact_cnt_1d"),
+            F.sum(F.when(F.col("action_taken") == "warn", 1).otherwise(0)).alias("warn_cnt_1d"),
+            F.round(F.avg("guardrail_latency_ms"), 2).alias("avg_guardrail_latency_ms"),
+            F.countDistinct("user_id").alias("distinct_user_cnt_1d"),
+        )
     )
 
 

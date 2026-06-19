@@ -4,6 +4,7 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from app.warehouse_contract import build_agent_team_run_1d_projection
 from app.logging_utils import get_logger, log_info
 from scripts.spark_utils import build_spark_session
 
@@ -56,23 +57,25 @@ def build_agent_team_daily_metrics(runs: DataFrame, spans: DataFrame, user_dim: 
         F.sum(F.when(F.col("span_type") == "llm_call", 1).otherwise(0)).alias("llm_span_cnt_1d"),
     )
 
-    return run_metrics.join(span_metrics, on=keys, how="left").select(
-        *keys,
-        "run_cnt_1d",
-        "success_cnt_1d",
-        "error_cnt_1d",
-        "turn_cnt_1d",
-        "llm_call_cnt_1d",
-        "tool_call_cnt_1d",
-        "retrieval_cnt_1d",
-        "total_token_cnt_1d",
-        "estimated_cost_amt_1d",
-        "avg_duration_ms",
-        "p95_duration_ms",
-        F.coalesce(F.col("span_cnt_1d"), F.lit(0)).alias("span_cnt_1d"),
-        F.coalesce(F.col("failed_span_cnt_1d"), F.lit(0)).alias("failed_span_cnt_1d"),
-        F.coalesce(F.col("tool_span_cnt_1d"), F.lit(0)).alias("tool_span_cnt_1d"),
-        F.coalesce(F.col("llm_span_cnt_1d"), F.lit(0)).alias("llm_span_cnt_1d"),
+    return build_agent_team_run_1d_projection(
+        run_metrics.join(span_metrics, on=keys, how="left").select(
+            *keys,
+            "run_cnt_1d",
+            "success_cnt_1d",
+            "error_cnt_1d",
+            "turn_cnt_1d",
+            "llm_call_cnt_1d",
+            "tool_call_cnt_1d",
+            "retrieval_cnt_1d",
+            "total_token_cnt_1d",
+            "estimated_cost_amt_1d",
+            "avg_duration_ms",
+            "p95_duration_ms",
+            F.coalesce(F.col("span_cnt_1d"), F.lit(0)).alias("span_cnt_1d"),
+            F.coalesce(F.col("failed_span_cnt_1d"), F.lit(0)).alias("failed_span_cnt_1d"),
+            F.coalesce(F.col("tool_span_cnt_1d"), F.lit(0)).alias("tool_span_cnt_1d"),
+            F.coalesce(F.col("llm_span_cnt_1d"), F.lit(0)).alias("llm_span_cnt_1d"),
+        )
     )
 
 

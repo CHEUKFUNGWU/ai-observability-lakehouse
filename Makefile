@@ -23,6 +23,9 @@ infra-stop:
 seed-data:
 	uv run python -m scripts.generate_mock_llm_logs --count 100 --seed 42
 	uv run python -m scripts.generate_mock_agent_logs --count 100 --seed 42
+	uv run python -m scripts.generate_mock_compliance_logs --count 100 --seed 42
+	uv run python -m scripts.generate_mock_orchestration_logs --count 100 --seed 42
+	uv run python -m scripts.generate_mock_platform_health_logs --sample-count 12 --seed 42
 	scripts/load_llm_jsonl_to_postgres_source.sh data/raw/mock_llm_requests/events.jsonl
 
 flink-up:

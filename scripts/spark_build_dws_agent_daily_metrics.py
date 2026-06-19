@@ -6,6 +6,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
+from app.warehouse_contract import build_agent_run_1d_projection
 from scripts.spark_utils import build_spark_session
 
 
@@ -49,23 +50,25 @@ def build_agent_daily_metrics(runs: DataFrame, spans: DataFrame) -> DataFrame:
         F.sum(F.when(F.col("span_type") == "llm_call", 1).otherwise(0)).alias("llm_span_count"),
     )
 
-    return run_metrics.join(span_metrics, on=keys, how="left").select(
-        *keys,
-        "run_count",
-        "success_count",
-        "error_count",
-        "turn_count",
-        "llm_call_count",
-        "tool_call_count",
-        "retrieval_count",
-        "total_tokens",
-        "estimated_cost_usd",
-        "avg_duration_ms",
-        "p95_duration_ms",
-        F.coalesce(F.col("span_count"), F.lit(0)).alias("span_count"),
-        F.coalesce(F.col("failed_span_count"), F.lit(0)).alias("failed_span_count"),
-        F.coalesce(F.col("tool_span_count"), F.lit(0)).alias("tool_span_count"),
-        F.coalesce(F.col("llm_span_count"), F.lit(0)).alias("llm_span_count"),
+    return build_agent_run_1d_projection(
+        run_metrics.join(span_metrics, on=keys, how="left").select(
+            *keys,
+            "run_count",
+            "success_count",
+            "error_count",
+            "turn_count",
+            "llm_call_count",
+            "tool_call_count",
+            "retrieval_count",
+            "total_tokens",
+            "estimated_cost_usd",
+            "avg_duration_ms",
+            "p95_duration_ms",
+            F.coalesce(F.col("span_count"), F.lit(0)).alias("span_count"),
+            F.coalesce(F.col("failed_span_count"), F.lit(0)).alias("failed_span_count"),
+            F.coalesce(F.col("tool_span_count"), F.lit(0)).alias("tool_span_count"),
+            F.coalesce(F.col("llm_span_count"), F.lit(0)).alias("llm_span_count"),
+        )
     )
 
 

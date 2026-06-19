@@ -4,6 +4,7 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from app.warehouse_contract import build_prompt_version_request_1d_projection
 from app.logging_utils import get_logger, log_info
 from scripts.spark_utils import build_spark_session
 
@@ -33,7 +34,9 @@ def build_prompt_version_daily_metrics(
     )
 
     if evaluation_events is None:
-        return request_metrics.withColumn("avg_evaluation_score", F.lit(None).cast("double"))
+        return build_prompt_version_request_1d_projection(
+            request_metrics.withColumn("avg_evaluation_score", F.lit(None).cast("double"))
+        )
 
     evaluation_scores = evaluation_events.groupBy(
         "date",
@@ -41,23 +44,12 @@ def build_prompt_version_daily_metrics(
         F.col("evaluated_model_name").alias("model_name"),
     ).agg(F.round(F.avg("score"), 4).alias("avg_evaluation_score"))
 
-    return request_metrics.join(
-        evaluation_scores,
-        on=["date", "prompt_version", "model_name"],
-        how="left",
-    ).select(
-        "date",
-        "prompt_id",
-        "prompt_version",
-        "model_name",
-        "request_cnt_1d",
-        "success_cnt_1d",
-        "error_cnt_1d",
-        "avg_latency_ms",
-        "p95_latency_ms",
-        "total_token_cnt_1d",
-        "estimated_cost_amt_1d",
-        "avg_evaluation_score",
+    return build_prompt_version_request_1d_projection(
+        request_metrics.join(
+            evaluation_scores,
+            on=["date", "prompt_version", "model_name"],
+            how="left",
+        )
     )
 
 

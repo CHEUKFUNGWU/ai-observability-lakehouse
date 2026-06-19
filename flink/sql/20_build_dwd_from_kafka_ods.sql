@@ -216,3 +216,67 @@ WHERE deployment_id IS NOT NULL
   AND traffic_percentage BETWEEN 0.0 AND 100.0
   AND target_environment IN ('dev', 'staging', 'prod')
   AND status IN ('success', 'failed', 'in_progress');
+
+INSERT INTO paimon_lake.dwd.dwd_ai_compliance_access_audit_di
+SELECT
+    audit_event_id,
+    user_id,
+    action_type,
+    resource_type,
+    resource_id,
+    ip_address,
+    access_granted,
+    denial_reason,
+    data_classification,
+    created_at,
+    `date`
+FROM ods_ai_observability_compliance_access_audit_events_di
+WHERE audit_event_id IS NOT NULL
+  AND created_at IS NOT NULL
+  AND CHAR_LENGTH(ip_address) = 64
+  AND action_type IN ('query', 'export', 'view_prompt', 'view_response', 'delete', 'admin_override')
+  AND resource_type IN ('dashboard', 'dwd_table', 'raw_log', 'prompt_text', 'response_text')
+  AND data_classification IN ('public', 'internal', 'confidential', 'restricted')
+  AND (access_granted OR denial_reason IS NOT NULL);
+
+INSERT INTO paimon_lake.dwd.dwd_ai_compliance_data_retention_di
+SELECT
+    retention_event_id,
+    table_name,
+    partition_date,
+    action_type,
+    rows_affected,
+    policy_name,
+    created_at,
+    `date`
+FROM ods_ai_observability_compliance_data_retention_events_di
+WHERE retention_event_id IS NOT NULL
+  AND created_at IS NOT NULL
+  AND partition_date IS NOT NULL
+  AND action_type IN ('archive', 'anonymize', 'delete')
+  AND rows_affected >= 0
+  AND policy_name IS NOT NULL;
+
+INSERT INTO paimon_lake.dwd.dwd_ai_agent_orchestration_di
+SELECT
+    orchestration_id,
+    trace_id,
+    parent_run_id,
+    child_run_id,
+    parent_agent_id,
+    child_agent_id,
+    handoff_type,
+    payload_size,
+    handoff_latency_ms,
+    status,
+    created_at,
+    `date`
+FROM ods_ai_observability_agent_orchestration_events_di
+WHERE orchestration_id IS NOT NULL
+  AND created_at IS NOT NULL
+  AND parent_run_id <> child_run_id
+  AND parent_agent_id <> child_agent_id
+  AND handoff_type IN ('delegate', 'callback', 'broadcast', 'sequential')
+  AND payload_size >= 0
+  AND handoff_latency_ms >= 0
+  AND status IN ('success', 'error', 'timeout');

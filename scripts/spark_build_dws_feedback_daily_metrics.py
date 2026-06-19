@@ -5,6 +5,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
+from app.warehouse_contract import build_feedback_feature_action_1d_projection
 from scripts.spark_utils import build_spark_session
 
 
@@ -18,18 +19,20 @@ def load_dwd_events(spark: SparkSession, input_path: Path) -> DataFrame:
 
 
 def build_feedback_daily_metrics(events: DataFrame) -> DataFrame:
-    return events.groupBy("date", "app_name", "feature_name", "agent_id").agg(
-        F.count("*").alias("feedback_cnt_1d"),
-        F.sum(F.when(F.col("feedback_type") == "thumbs_up", 1).otherwise(0)).alias("thumbs_up_cnt_1d"),
-        F.sum(F.when(F.col("feedback_type") == "thumbs_down", 1).otherwise(0)).alias(
-            "thumbs_down_cnt_1d"
-        ),
-        F.sum(F.when(F.col("feedback_type") == "regenerate", 1).otherwise(0)).alias(
-            "regenerate_cnt_1d"
-        ),
-        F.sum(F.when(F.col("feedback_type") == "report", 1).otherwise(0)).alias("report_cnt_1d"),
-        F.round(F.avg("rating_value"), 2).alias("avg_rating"),
-        F.countDistinct("request_id").alias("rated_request_cnt_1d"),
+    return build_feedback_feature_action_1d_projection(
+        events.groupBy("date", "app_name", "feature_name", "agent_id").agg(
+            F.count("*").alias("feedback_cnt_1d"),
+            F.sum(F.when(F.col("feedback_type") == "thumbs_up", 1).otherwise(0)).alias("thumbs_up_cnt_1d"),
+            F.sum(F.when(F.col("feedback_type") == "thumbs_down", 1).otherwise(0)).alias(
+                "thumbs_down_cnt_1d"
+            ),
+            F.sum(F.when(F.col("feedback_type") == "regenerate", 1).otherwise(0)).alias(
+                "regenerate_cnt_1d"
+            ),
+            F.sum(F.when(F.col("feedback_type") == "report", 1).otherwise(0)).alias("report_cnt_1d"),
+            F.round(F.avg("rating_value"), 2).alias("avg_rating"),
+            F.countDistinct("request_id").alias("rated_request_cnt_1d"),
+        )
     )
 
 

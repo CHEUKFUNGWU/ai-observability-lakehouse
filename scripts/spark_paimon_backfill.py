@@ -8,6 +8,10 @@ from pyspark.sql import functions as F
 from app.data_quality import split_valid_quarantine, validate_llm_events
 from app.logging_utils import get_logger, log_info
 from app.pipeline_metadata import append_pipeline_run
+from app.warehouse_contract import (
+    render_llm_feature_request_1d_paimon_bootstrap,
+    render_llm_request_paimon_bootstrap,
+)
 from scripts.generate_mock_llm_logs import write_jsonl
 from scripts.spark_build_dws_llm_feature_daily_metrics import build_feature_daily_metrics
 from scripts.spark_transform_llm_events import transform_llm_events
@@ -60,46 +64,7 @@ def ensure_paimon_tables(spark: SparkSession) -> None:
     spark.sql(
         """
         CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_llm_request_di (
-            request_id STRING,
-            trace_id STRING,
-            run_id STRING,
-            span_id STRING,
-            agent_id STRING,
-            agent_name STRING,
-            channel STRING,
-            user_id STRING,
-            session_id STRING,
-            conversation_id STRING,
-            app_name STRING,
-            feature_name STRING,
-            prompt_category STRING,
-            prompt_id STRING,
-            prompt_version STRING,
-            model_name STRING,
-            provider STRING,
-            prompt_hash STRING,
-            response_hash STRING,
-            input_chars INT,
-            output_chars INT,
-            prompt_tokens INT,
-            completion_tokens INT,
-            total_tokens INT,
-            request_type STRING,
-            is_streaming BOOLEAN,
-            temperature DOUBLE,
-            max_tokens INT,
-            finish_reason STRING,
-            retry_count INT,
-            latency_ms INT,
-            status STRING,
-            error_type STRING,
-            http_status INT,
-            estimated_cost_usd DOUBLE,
-            mode STRING,
-            region STRING,
-            environment STRING,
-            created_at TIMESTAMP,
-            `date` DATE
+{columns}
         ) USING paimon
         PARTITIONED BY (`date`)
         TBLPROPERTIES (
@@ -107,24 +72,12 @@ def ensure_paimon_tables(spark: SparkSession) -> None:
             'bucket' = '-1'
         )
         """
+        .format(columns=render_llm_request_paimon_bootstrap())
     )
     spark.sql(
         """
         CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_llm_feature_request_1d (
-            app_name STRING,
-            feature_name STRING,
-            model_name STRING,
-            request_count BIGINT,
-            success_count BIGINT,
-            error_count BIGINT,
-            prompt_tokens BIGINT,
-            completion_tokens BIGINT,
-            total_tokens BIGINT,
-            estimated_cost_usd DOUBLE,
-            avg_latency_ms DOUBLE,
-            max_latency_ms BIGINT,
-            p95_latency_ms BIGINT,
-            `date` DATE
+{columns}
         ) USING paimon
         PARTITIONED BY (`date`)
         TBLPROPERTIES (
@@ -132,6 +85,7 @@ def ensure_paimon_tables(spark: SparkSession) -> None:
             'bucket' = '4'
         )
         """
+        .format(columns=render_llm_feature_request_1d_paimon_bootstrap())
     )
 
 

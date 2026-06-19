@@ -53,7 +53,11 @@ for topic in \
   ods_ai_observability_feedback_events_di \
   ods_ai_observability_guardrail_events_di \
   ods_ai_observability_evaluation_events_di \
-  ods_ai_observability_model_deployment_events_di
+  ods_ai_observability_model_deployment_events_di \
+  ods_ai_observability_compliance_access_audit_events_di \
+  ods_ai_observability_compliance_data_retention_events_di \
+  ods_ai_observability_agent_orchestration_events_di \
+  ods_ai_observability_platform_health_metrics_di
 do
   if grep -qx "${topic}" <<<"${topics}"; then
     pass "Kafka topic ${topic} exists"
@@ -93,6 +97,9 @@ expected = {
     "insert-into_paimon_lake.dwd.dwd_ai_guardrail_check_di": False,
     "insert-into_paimon_lake.dwd.dwd_ai_evaluation_judgment_di": False,
     "insert-into_paimon_lake.dwd.dwd_ai_model_deployment_di": False,
+    "insert-into_paimon_lake.dwd.dwd_ai_compliance_access_audit_di": False,
+    "insert-into_paimon_lake.dwd.dwd_ai_compliance_data_retention_di": False,
+    "insert-into_paimon_lake.dwd.dwd_ai_agent_orchestration_di": False,
     "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1d": False,
     "insert-into_paimon_lake.dws.dws_ai_retrieval_knowledge_base_request_1d": False,
     "insert-into_paimon_lake.dws.dws_ai_feedback_feature_action_1d": False,
@@ -100,6 +107,8 @@ expected = {
     "insert-into_paimon_lake.dws.dws_ai_evaluation_feature_judgment_1d": False,
     "insert-into_paimon_lake.dws.dws_ai_llm_feature_request_1h": False,
     "insert-into_paimon_lake.dws.dws_ai_llm_session_request_1d": False,
+    "insert-into_paimon_lake.dws.dws_ai_agent_orchestration_handoff_1d": False,
+    "insert-into_paimon_lake.dws.dws_ai_platform_component_health_1d": False,
 }
 for name in running_names:
     for expected_name in expected:

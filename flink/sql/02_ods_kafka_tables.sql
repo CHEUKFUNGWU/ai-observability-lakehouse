@@ -224,3 +224,93 @@ CREATE TABLE IF NOT EXISTS ods_ai_observability_model_deployment_events_di (
     'value.json.fail-on-missing-field' = 'false',
     'value.json.ignore-parse-errors' = 'true'
 );
+
+CREATE TABLE IF NOT EXISTS ods_ai_observability_compliance_access_audit_events_di (
+    audit_event_id STRING,
+    user_id STRING,
+    action_type STRING,
+    resource_type STRING,
+    resource_id STRING,
+    ip_address STRING,
+    access_granted BOOLEAN,
+    denial_reason STRING,
+    data_classification STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (audit_event_id) NOT ENFORCED
+) WITH (
+    'connector' = 'upsert-kafka',
+    'topic' = 'ods_ai_observability_compliance_access_audit_events_di',
+    'properties.bootstrap.servers' = 'kafka:9092',
+    'properties.group.id' = 'flink-ods-compliance-access-audit-events',
+    'key.format' = 'json',
+    'value.format' = 'json',
+    'value.json.fail-on-missing-field' = 'false',
+    'value.json.ignore-parse-errors' = 'true'
+);
+
+CREATE TABLE IF NOT EXISTS ods_ai_observability_compliance_data_retention_events_di (
+    retention_event_id STRING,
+    table_name STRING,
+    partition_date DATE,
+    action_type STRING,
+    rows_affected BIGINT,
+    policy_name STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (retention_event_id) NOT ENFORCED
+) WITH (
+    'connector' = 'upsert-kafka',
+    'topic' = 'ods_ai_observability_compliance_data_retention_events_di',
+    'properties.bootstrap.servers' = 'kafka:9092',
+    'properties.group.id' = 'flink-ods-compliance-data-retention-events',
+    'key.format' = 'json',
+    'value.format' = 'json',
+    'value.json.fail-on-missing-field' = 'false',
+    'value.json.ignore-parse-errors' = 'true'
+);
+
+CREATE TABLE IF NOT EXISTS ods_ai_observability_agent_orchestration_events_di (
+    orchestration_id STRING,
+    trace_id STRING,
+    parent_run_id STRING,
+    child_run_id STRING,
+    parent_agent_id STRING,
+    child_agent_id STRING,
+    handoff_type STRING,
+    payload_size INT,
+    handoff_latency_ms INT,
+    status STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (orchestration_id) NOT ENFORCED
+) WITH (
+    'connector' = 'upsert-kafka',
+    'topic' = 'ods_ai_observability_agent_orchestration_events_di',
+    'properties.bootstrap.servers' = 'kafka:9092',
+    'properties.group.id' = 'flink-ods-agent-orchestration-events',
+    'key.format' = 'json',
+    'value.format' = 'json',
+    'value.json.fail-on-missing-field' = 'false',
+    'value.json.ignore-parse-errors' = 'true'
+);
+
+CREATE TABLE IF NOT EXISTS ods_ai_observability_platform_health_metrics_di (
+    metric_event_id STRING,
+    component STRING,
+    metric_name STRING,
+    metric_value DOUBLE,
+    threshold DOUBLE,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (metric_event_id) NOT ENFORCED
+) WITH (
+    'connector' = 'upsert-kafka',
+    'topic' = 'ods_ai_observability_platform_health_metrics_di',
+    'properties.bootstrap.servers' = 'kafka:9092',
+    'properties.group.id' = 'flink-ods-platform-health-metrics',
+    'key.format' = 'json',
+    'value.format' = 'json',
+    'value.json.fail-on-missing-field' = 'false',
+    'value.json.ignore-parse-errors' = 'true'
+);

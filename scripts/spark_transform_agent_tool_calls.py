@@ -2,9 +2,9 @@ import argparse
 from pathlib import Path
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
+from app.warehouse_contract import build_agent_tool_call_projection
 from scripts.spark_utils import build_spark_session
 
 
@@ -18,27 +18,7 @@ def load_ods_events(spark: SparkSession, input_path: Path) -> DataFrame:
 
 
 def transform_agent_tool_call_events(ods_events: DataFrame) -> DataFrame:
-    return ods_events.select(
-        F.col("tool_call_id").cast("string").alias("tool_call_id"),
-        F.col("span_id").cast("string").alias("span_id"),
-        F.col("run_id").cast("string").alias("run_id"),
-        F.col("trace_id").cast("string").alias("trace_id"),
-        F.col("agent_id").cast("string").alias("agent_id"),
-        F.col("tool_name").cast("string").alias("tool_name"),
-        F.col("tool_type").cast("string").alias("tool_type"),
-        F.col("arguments_json").cast("string").alias("arguments_json"),
-        F.col("result_text").cast("string").alias("result_text"),
-        F.col("result_size").cast("int").alias("result_size"),
-        F.col("duration_ms").cast("int").alias("duration_ms"),
-        F.col("status").cast("string").alias("status"),
-        F.col("error_type").cast("string").alias("error_type"),
-        F.col("retry_count").cast("int").alias("retry_count"),
-        F.col("mode").cast("string").alias("mode"),
-        F.col("region").cast("string").alias("region"),
-        F.col("environment").cast("string").alias("environment"),
-        F.to_timestamp("created_at").alias("created_at"),
-        F.to_date("date").alias("date"),
-    )
+    return build_agent_tool_call_projection(ods_events)
 
 
 def write_parquet(events: DataFrame, output_path: Path) -> None:

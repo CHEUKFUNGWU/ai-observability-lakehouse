@@ -60,3 +60,13 @@ SELECT
     COUNT(*) AS dws_llm_session_metric_rows,
     SUM(session_cnt_1d) AS total_session_cnt_1d
 FROM paimon_lake.dws.dws_ai_llm_session_request_1d;
+
+SELECT
+    COUNT(*) AS dws_agent_orchestration_metric_rows,
+    SUM(handoff_cnt_1d) AS total_handoff_cnt_1d
+FROM paimon_lake.dws.dws_ai_agent_orchestration_handoff_1d;
+
+SELECT
+    COUNT(*) AS dws_platform_health_metric_rows,
+    SUM(CASE WHEN is_breach THEN 1 ELSE 0 END) AS breached_metric_cnt_1d
+FROM paimon_lake.dws.dws_ai_platform_component_health_1d;

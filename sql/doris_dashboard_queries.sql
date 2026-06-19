@@ -41,7 +41,58 @@ FROM ai_observability.dws_ai_llm_feature_request_1d
 GROUP BY feature_name
 ORDER BY estimated_cost_usd DESC;
 
--- 4. Reliability by feature.
+-- 4. Denied access attempts by classification and action.
+SELECT
+    `date`,
+    data_classification,
+    action_type,
+    denial_reason,
+    COUNT(*) AS denied_access_cnt_1d,
+    COUNT(DISTINCT user_id) AS denied_user_cnt_1d
+FROM ai_observability.dwd_ai_compliance_access_audit_di
+WHERE access_granted = FALSE
+GROUP BY `date`, data_classification, action_type, denial_reason
+ORDER BY `date` DESC, denied_access_cnt_1d DESC;
+
+-- 5. Retention policy enforcement evidence.
+SELECT
+    `date`,
+    policy_name,
+    table_name,
+    action_type,
+    COUNT(*) AS retention_action_cnt_1d,
+    SUM(rows_affected) AS rows_affected_cnt_1d
+FROM ai_observability.dwd_ai_compliance_data_retention_di
+GROUP BY `date`, policy_name, table_name, action_type
+ORDER BY `date` DESC, rows_affected_cnt_1d DESC;
+
+-- 6. Inter-agent handoff bottlenecks.
+SELECT
+    `date`,
+    parent_agent_id,
+    child_agent_id,
+    handoff_type,
+    handoff_cnt_1d,
+    error_cnt_1d,
+    timeout_cnt_1d,
+    avg_handoff_latency_ms,
+    p95_handoff_latency_ms
+FROM ai_observability.dws_ai_agent_orchestration_handoff_1d
+ORDER BY `date` DESC, p95_handoff_latency_ms DESC, timeout_cnt_1d DESC;
+
+-- 7. Platform health threshold breaches.
+SELECT
+    `date`,
+    component,
+    metric_name,
+    metric_value,
+    threshold,
+    ROUND(metric_value / NULLIF(threshold, 0), 4) AS threshold_utilization
+FROM ai_observability.dws_ai_platform_component_health_1d
+WHERE is_breach = TRUE
+ORDER BY `date` DESC, threshold_utilization DESC;
+
+-- 8. Reliability by feature.
 SELECT
     feature_name,
     request_count,
@@ -61,7 +112,7 @@ FROM
 ) feature_rollup
 ORDER BY error_rate DESC, request_count DESC;
 
--- 5. Latency by feature.
+-- 9. Latency by feature.
 SELECT
     feature_name,
     ROUND(SUM(avg_latency_ms * request_count) / NULLIF(SUM(request_count), 0), 2) AS weighted_avg_latency_ms
@@ -69,7 +120,7 @@ FROM ai_observability.dws_ai_llm_feature_request_1d
 GROUP BY feature_name
 ORDER BY weighted_avg_latency_ms DESC;
 
--- 6. Cost and usage by model.
+-- 10. Cost and usage by model.
 SELECT
     model_name,
     request_count,
@@ -88,7 +139,7 @@ FROM
 ) model_rollup
 ORDER BY estimated_cost_usd DESC;
 
--- 7. App and feature leaderboard.
+-- 11. App and feature leaderboard.
 SELECT
     app_name,
     feature_name,
@@ -110,7 +161,7 @@ FROM
 ) leaderboard
 ORDER BY request_count_sum DESC;
 
--- 8. Cost by model with pricing metadata.
+-- 12. Cost by model with pricing metadata.
 SELECT
     m.model_name,
     m.provider,

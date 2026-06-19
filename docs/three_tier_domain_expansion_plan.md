@@ -569,7 +569,9 @@ These domains become urgent only at enterprise scale: when there are regulatory 
 
 #### DWD: `dwd_ai_compliance_data_retention_di`
 
-Tracks when data is archived, anonymized or deleted per retention policy. Fields: retention_event_id, table_name, partition_date, action (archive / anonymize / delete), rows_affected, policy_name, created_at.
+Tracks when data is archived, anonymized or deleted per retention policy. Fields: retention_event_id, table_name, partition_date, action_type (archive / anonymize / delete), rows_affected, policy_name, created_at, date.
+
+Implementation status: `dwd_ai_compliance_access_audit_di` and `dwd_ai_compliance_data_retention_di` are implemented with privacy-safe mock events, Spark transforms, Kafka ODS contracts, Paimon/Flink DWD definitions, Doris DDL and verification tests. Source IP values are SHA-256 hashes before they enter the event contract.
 
 ---
 
@@ -601,7 +603,9 @@ Tracks when data is archived, anonymized or deleted per retention policy. Fields
 
 #### DWS: `dws_ai_agent_orchestration_handoff_1d`
 
-Grouping: `date`, `parent_agent_id`, `child_agent_id`, `handoff_type`. Metrics: handoff_count, success_count, error_count, timeout_count, avg_handoff_latency_ms, p95_handoff_latency_ms.
+Grouping: `date`, `parent_agent_id`, `child_agent_id`, `handoff_type`. Metrics: handoff_cnt_1d, success_cnt_1d, error_cnt_1d, timeout_cnt_1d, avg_handoff_latency_ms, p95_handoff_latency_ms.
+
+Implementation status: `dwd_ai_agent_orchestration_di` and `dws_ai_agent_orchestration_handoff_1d` are implemented with mock handoff events, Spark transform and daily aggregation, Kafka/Paimon/Flink assets, Doris serving DDL and tests.
 
 ---
 
@@ -629,6 +633,22 @@ Grouping: `date`, `parent_agent_id`, `child_agent_id`, `handoff_type`. Metrics: 
 Components: `kafka` (consumer lag, topic size), `flink` (checkpoint duration, restart count, backpressure), `paimon` (snapshot count, file count, table size), `doris` (query p95, compaction lag, tablet count).
 
 Source: Kafka JMX, Flink REST API, Paimon catalog metadata, Doris `information_schema`.
+
+Implementation status: `dws_ai_platform_component_health_1d` is implemented with a normalized health metric contract, configurable thresholds in `config/platform_health_thresholds.yaml`, mock source samples for all four components, Spark daily-max aggregation, Flink/Paimon DWS assets, Doris sync and tests. Production collectors should map JMX, REST, catalog and `information_schema` observations into the same ODS contract.
+
+---
+
+### 5.5 Tier 3 Implementation Files
+
+| Category | Files |
+|---|---|
+| Domain models | `app/compliance_event.py`, `app/orchestration_event.py`, `app/platform_health_metric.py` |
+| Source adapters | `scripts/generate_mock_compliance_logs.py`, `scripts/generate_mock_orchestration_logs.py`, `scripts/generate_mock_platform_health_logs.py` |
+| Spark transforms | `scripts/spark_transform_compliance_events.py`, `scripts/spark_transform_agent_orchestration_events.py` |
+| DWS builders | `scripts/spark_build_dws_agent_orchestration_daily_metrics.py`, `scripts/spark_build_dws_platform_health_daily_metrics.py` |
+| Thresholds | `config/platform_health_thresholds.yaml` |
+| Warehouse assets | `flink/sql/02_ods_kafka_tables.sql` through `flink/sql/92_verify_dws_metrics.sql`, `sql/create_doris_tables.sql`, `sql/doris_sync_paimon_dws.sql` |
+| Tests | `tests/test_compliance_events.py`, `tests/test_agent_orchestration_events.py`, `tests/test_platform_health_metrics.py` |
 
 ---
 
@@ -689,7 +709,7 @@ Implementation: `dws_ai_llm_feature_env_request_1d` and `dws_ai_llm_region_reque
 
 ## 7. Complete Table Inventory After Three Tiers
 
-### DWD Fact Tables (11 total, +7 new)
+### DWD Fact Tables (12 total, +8 new)
 
 | Table | Tier | Domain |
 |---|---|---|
@@ -703,6 +723,7 @@ Implementation: `dws_ai_llm_feature_env_request_1d` and `dws_ai_llm_region_reque
 | `dwd_ai_evaluation_judgment_di` | Tier 2 | Evaluation |
 | `dwd_ai_model_deployment_di` | Tier 2 | Deployment |
 | `dwd_ai_compliance_access_audit_di` | Tier 3 | Compliance |
+| `dwd_ai_compliance_data_retention_di` | Tier 3 | Compliance |
 | `dwd_ai_agent_orchestration_di` | Tier 3 | Multi-Agent |
 
 ### DWS Summary Tables (16 total, +13 new)
@@ -752,7 +773,9 @@ Implementation: `dws_ai_llm_feature_env_request_1d` and `dws_ai_llm_region_reque
 | `dim_prompt_version_df` | Tier 2 | Prompt |
 | `dim_model_version_df` | Tier 2 | Model |
 
-### Total: 43 tables (from 11)
+### Total: 44 tables (from 11)
+
+Implementation status: all Tier 1, Tier 2 and Tier 3 tables in this inventory are implemented.
 
 ---
 
@@ -796,4 +819,4 @@ Within each tier, DWD is always built first, then DWS, then ADS. Dimensions can 
 | Table proliferation creates maintenance overhead | Increases pipeline failure surface | Use a shared DQ framework (already exists in `app/data_quality.py`) for all new DWD tables; automate DWS builds with a registry pattern |
 | Hourly DWS tables multiply Paimon snapshot count | Storage growth and compaction pressure | Configure Paimon snapshot expiration (`snapshot.time-retained: 24h` for hourly tables) and enable async compaction |
 | Team/user dimensions require PII governance | Compliance risk | Store only `user_id` and `team_id` in DWD/DWS; keep PII (names, emails) only in `dim_user_df` with access controls |
-| Multi-agent orchestration events are hard to capture from existing runtimes | Tier 3 scope creep | Defer until the enterprise actually runs multi-agent workflows; treat as optional |
+| Multi-agent runtimes emit different handoff shapes | Inconsistent topology and latency metrics | Map runtime-specific events into the generic parent-run/child-run handoff contract before ODS ingestion |

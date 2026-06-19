@@ -263,3 +263,44 @@ satisfaction_rate_1w = thumbs_up_cnt_1w / (thumbs_up_cnt_1w + thumbs_down_cnt_1w
 evaluation_pass_rate_1w = evaluation_pass_cnt_1w / evaluation_cnt_1w
 total_ai_cost_amt_1w = llm_cost_amt_1w + agent_cost_amt_1w
 ```
+
+---
+
+## 16. Agent Handoff Metrics
+
+### Definition
+
+`dws_ai_agent_orchestration_handoff_1d` groups inter-agent handoffs by date, parent agent, child agent and handoff type.
+
+```text
+handoff_cnt_1d = count(orchestration events)
+success_cnt_1d = count(status = 'success')
+error_cnt_1d = count(status = 'error')
+timeout_cnt_1d = count(status = 'timeout')
+avg_handoff_latency_ms = avg(handoff_latency_ms)
+```
+
+The Spark batch builder calculates `p95_handoff_latency_ms` with `percentile_approx`. The current Flink streaming path uses the maximum handoff latency as a conservative proxy, consistent with the existing Flink percentile limitation.
+
+---
+
+## 17. Retention Enforcement Metrics
+
+### Definition
+
+Retention enforcement volume is derived from `dwd_ai_compliance_data_retention_di`. `rows_affected` counts rows archived, anonymized or deleted by one policy action. A zero value is valid evidence that the policy ran against an empty partition.
+
+---
+
+## 18. Platform Health Breach
+
+### Definition
+
+`dws_ai_platform_component_health_1d` keeps the maximum observed value per date, component and metric. All configured thresholds are upper bounds.
+
+```text
+metric_value = max(observed metric value during the day)
+is_breach = metric_value > threshold
+```
+
+Thresholds are defined in `config/platform_health_thresholds.yaml`. A value equal to the threshold is not a breach.

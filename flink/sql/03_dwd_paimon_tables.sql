@@ -181,3 +181,52 @@ CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_model_deployment_di (
 ) WITH (
     'bucket' = '4'
 );
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_compliance_access_audit_di (
+    audit_event_id STRING,
+    user_id STRING,
+    action_type STRING,
+    resource_type STRING,
+    resource_id STRING,
+    ip_address STRING,
+    access_granted BOOLEAN,
+    denial_reason STRING,
+    data_classification STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (audit_event_id) NOT ENFORCED
+) WITH (
+    'bucket' = '4'
+);
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_compliance_data_retention_di (
+    retention_event_id STRING,
+    table_name STRING,
+    partition_date DATE,
+    action_type STRING,
+    rows_affected BIGINT,
+    policy_name STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (retention_event_id) NOT ENFORCED
+) WITH (
+    'bucket' = '4'
+);
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dwd.dwd_ai_agent_orchestration_di (
+    orchestration_id STRING,
+    trace_id STRING,
+    parent_run_id STRING,
+    child_run_id STRING,
+    parent_agent_id STRING,
+    child_agent_id STRING,
+    handoff_type STRING,
+    payload_size INT,
+    handoff_latency_ms INT,
+    status STRING,
+    created_at TIMESTAMP(3),
+    `date` DATE,
+    PRIMARY KEY (orchestration_id) NOT ENFORCED
+) WITH (
+    'bucket' = '4'
+);

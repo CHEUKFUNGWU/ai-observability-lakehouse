@@ -4,6 +4,7 @@ from pathlib import Path
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
+from app.warehouse_contract import build_llm_session_request_1d_projection
 from app.logging_utils import get_logger, log_info
 from scripts.spark_utils import build_spark_session
 
@@ -37,7 +38,7 @@ def build_session_daily_metrics(llm_events: DataFrame, feedback_events: DataFram
         ).alias("is_resolved")
     )
 
-    return (
+    return build_llm_session_request_1d_projection(
         per_session.join(resolved_sessions, on=keys, how="left")
         .fillna({"is_resolved": 0})
         .groupBy("date", "app_name", "feature_name")

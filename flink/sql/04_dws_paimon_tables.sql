@@ -229,3 +229,31 @@ CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_agent_team_run_1d (
 ) PARTITIONED BY (`date`) WITH (
     'bucket' = '4'
 );
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_agent_orchestration_handoff_1d (
+    `date` DATE,
+    parent_agent_id STRING,
+    child_agent_id STRING,
+    handoff_type STRING,
+    handoff_cnt_1d BIGINT,
+    success_cnt_1d BIGINT,
+    error_cnt_1d BIGINT,
+    timeout_cnt_1d BIGINT,
+    avg_handoff_latency_ms DOUBLE,
+    p95_handoff_latency_ms BIGINT,
+    PRIMARY KEY (`date`, parent_agent_id, child_agent_id, handoff_type) NOT ENFORCED
+) PARTITIONED BY (`date`) WITH (
+    'bucket' = '4'
+);
+
+CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_platform_component_health_1d (
+    `date` DATE,
+    component STRING,
+    metric_name STRING,
+    metric_value DOUBLE,
+    threshold DOUBLE,
+    is_breach BOOLEAN,
+    PRIMARY KEY (`date`, component, metric_name) NOT ENFORCED
+) PARTITIONED BY (`date`) WITH (
+    'bucket' = '4'
+);

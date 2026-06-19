@@ -8,6 +8,7 @@ from pyspark.sql import functions as F
 from app.data_quality import split_valid_quarantine, validate_llm_events
 from app.logging_utils import get_logger, log_info
 from app.pipeline_metadata import append_pipeline_run
+from app.warehouse_contract import build_llm_request_projection
 from scripts.spark_utils import build_spark_session
 
 
@@ -22,53 +23,7 @@ def load_ods_events(spark: SparkSession, input_path: Path) -> DataFrame:
 
 
 def transform_llm_events(raw_events: DataFrame) -> DataFrame:
-    source_columns = set(raw_events.columns)
-
-    def event_col(name: str, default):
-        return F.col(name) if name in source_columns else F.lit(default)
-
-    return raw_events.select(
-        F.col("request_id").cast("string").alias("request_id"),
-        event_col("trace_id", "").cast("string").alias("trace_id"),
-        event_col("run_id", "").cast("string").alias("run_id"),
-        event_col("span_id", "").cast("string").alias("span_id"),
-        event_col("agent_id", "").cast("string").alias("agent_id"),
-        event_col("agent_name", "").cast("string").alias("agent_name"),
-        event_col("channel", "").cast("string").alias("channel"),
-        F.col("user_id").cast("string").alias("user_id"),
-        F.col("session_id").cast("string").alias("session_id"),
-        event_col("conversation_id", "").cast("string").alias("conversation_id"),
-        F.col("app_name").cast("string").alias("app_name"),
-        F.col("feature_name").cast("string").alias("feature_name"),
-        F.col("prompt_category").cast("string").alias("prompt_category"),
-        F.col("prompt_id").cast("string").alias("prompt_id"),
-        F.col("prompt_version").cast("string").alias("prompt_version"),
-        F.col("model_name").cast("string").alias("model_name"),
-        F.col("provider").cast("string").alias("provider"),
-        event_col("prompt_hash", "").cast("string").alias("prompt_hash"),
-        event_col("response_hash", "").cast("string").alias("response_hash"),
-        event_col("input_chars", 0).cast("int").alias("input_chars"),
-        event_col("output_chars", 0).cast("int").alias("output_chars"),
-        F.col("prompt_tokens").cast("int").alias("prompt_tokens"),
-        F.col("completion_tokens").cast("int").alias("completion_tokens"),
-        F.col("total_tokens").cast("int").alias("total_tokens"),
-        event_col("request_type", "chat").cast("string").alias("request_type"),
-        event_col("is_streaming", False).cast("boolean").alias("is_streaming"),
-        event_col("temperature", 0.0).cast("double").alias("temperature"),
-        event_col("max_tokens", 0).cast("int").alias("max_tokens"),
-        event_col("finish_reason", "").cast("string").alias("finish_reason"),
-        event_col("retry_count", 0).cast("int").alias("retry_count"),
-        F.col("latency_ms").cast("int").alias("latency_ms"),
-        F.col("status").cast("string").alias("status"),
-        F.col("error_type").cast("string").alias("error_type"),
-        F.col("http_status").cast("int").alias("http_status"),
-        F.col("estimated_cost_usd").cast("double").alias("estimated_cost_usd"),
-        F.col("mode").cast("string").alias("mode"),
-        F.col("region").cast("string").alias("region"),
-        F.col("environment").cast("string").alias("environment"),
-        F.to_timestamp("created_at").alias("created_at"),
-        F.to_date("date").alias("date"),
-    )
+    return build_llm_request_projection(raw_events)
 
 
 def write_parquet(events: DataFrame, output_path: Path) -> None:

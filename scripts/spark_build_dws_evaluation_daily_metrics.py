@@ -5,6 +5,7 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
 from app.logging_utils import get_logger, log_info
+from app.warehouse_contract import build_evaluation_feature_judgment_1d_projection
 from scripts.spark_utils import build_spark_session
 
 
@@ -18,19 +19,21 @@ def load_dwd_events(spark: SparkSession, input_path: Path) -> DataFrame:
 
 
 def build_evaluation_daily_metrics(events: DataFrame) -> DataFrame:
-    return events.groupBy(
-        "date",
-        "app_name",
-        "feature_name",
-        "evaluation_dimension",
-        "evaluated_model_name",
-    ).agg(
-        F.count("*").alias("evaluation_cnt_1d"),
-        F.sum(F.when(F.col("passed"), 1).otherwise(0)).alias("pass_cnt_1d"),
-        F.sum(F.when(~F.col("passed"), 1).otherwise(0)).alias("fail_cnt_1d"),
-        F.round(F.avg("score"), 4).alias("avg_score"),
-        F.expr("percentile_approx(score, 0.10)").alias("p10_score"),
-        F.round(F.avg("evaluation_latency_ms"), 2).alias("avg_evaluation_latency_ms"),
+    return build_evaluation_feature_judgment_1d_projection(
+        events.groupBy(
+            "date",
+            "app_name",
+            "feature_name",
+            "evaluation_dimension",
+            "evaluated_model_name",
+        ).agg(
+            F.count("*").alias("evaluation_cnt_1d"),
+            F.sum(F.when(F.col("passed"), 1).otherwise(0)).alias("pass_cnt_1d"),
+            F.sum(F.when(~F.col("passed"), 1).otherwise(0)).alias("fail_cnt_1d"),
+            F.round(F.avg("score"), 4).alias("avg_score"),
+            F.expr("percentile_approx(score, 0.10)").alias("p10_score"),
+            F.round(F.avg("evaluation_latency_ms"), 2).alias("avg_evaluation_latency_ms"),
+        )
     )
 
 
