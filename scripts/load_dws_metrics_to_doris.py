@@ -31,6 +31,58 @@ LOAD_COLUMNS = [
     "max_latency_ms",
     "p95_latency_ms",
 ]
+DIM_MODEL_COLUMNS = [
+    "model_name",
+    "provider",
+    "input_price_per_1m_tokens",
+    "output_price_per_1m_tokens",
+    "max_context_tokens",
+    "release_date",
+    "status",
+]
+COMPLIANCE_ACCESS_COLUMNS = [
+    "date",
+    "audit_event_id",
+    "user_id",
+    "action_type",
+    "resource_type",
+    "resource_id",
+    "ip_address",
+    "access_granted",
+    "denial_reason",
+    "data_classification",
+    "created_at",
+]
+COMPLIANCE_RETENTION_COLUMNS = [
+    "date",
+    "retention_event_id",
+    "table_name",
+    "partition_date",
+    "action_type",
+    "rows_affected",
+    "policy_name",
+    "created_at",
+]
+AGENT_ORCHESTRATION_HANDOFF_COLUMNS = [
+    "date",
+    "parent_agent_id",
+    "child_agent_id",
+    "handoff_type",
+    "handoff_cnt_1d",
+    "success_cnt_1d",
+    "error_cnt_1d",
+    "timeout_cnt_1d",
+    "avg_handoff_latency_ms",
+    "p95_handoff_latency_ms",
+]
+PLATFORM_HEALTH_COLUMNS = [
+    "date",
+    "component",
+    "metric_name",
+    "metric_value",
+    "threshold",
+    "is_breach",
+]
 EXECUTIVE_WEEKLY_COLUMNS = [
     "week_start_date",
     "app_name",
@@ -66,6 +118,11 @@ EXECUTIVE_WEEKLY_COLUMNS = [
 TABLE_LOAD_COLUMNS = {
     DEFAULT_TABLE_NAME: LOAD_COLUMNS,
     "ads_observability_executive_weekly_summary": EXECUTIVE_WEEKLY_COLUMNS,
+    "dim_model_df": DIM_MODEL_COLUMNS,
+    "dwd_ai_compliance_access_audit_di": COMPLIANCE_ACCESS_COLUMNS,
+    "dwd_ai_compliance_data_retention_di": COMPLIANCE_RETENTION_COLUMNS,
+    "dws_ai_agent_orchestration_handoff_1d": AGENT_ORCHESTRATION_HANDOFF_COLUMNS,
+    "dws_ai_platform_component_health_1d": PLATFORM_HEALTH_COLUMNS,
 }
 
 

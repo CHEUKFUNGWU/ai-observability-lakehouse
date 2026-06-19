@@ -33,18 +33,19 @@ docker compose exec -T superset superset init
 echo "Registering Doris database connection..."
 docker compose exec -T superset python3 -c "
 from superset.app import create_app
-from superset.extensions import db
-from superset.models.core import Database
 
 app = create_app()
 with app.app_context():
+    from superset.extensions import db
+    from superset.models.core import Database
+
     existing = db.session.query(Database).filter_by(
         database_name='AI Observability (Doris)'
     ).first()
     if not existing:
         doris_db = Database(
             database_name='AI Observability (Doris)',
-            sqlalchemy_uri='mysql://root:@doris-fe:9030/ai_observability',
+            sqlalchemy_uri='mysql+pymysql://root:@doris-fe:9030/ai_observability',
             expose_in_sqllab=True,
             allow_run_async=True,
         )
@@ -52,6 +53,12 @@ with app.app_context():
         db.session.commit()
         print('Doris database registered.')
     else:
+        if existing.sqlalchemy_uri != 'mysql+pymysql://root:@doris-fe:9030/ai_observability':
+            existing.sqlalchemy_uri = 'mysql+pymysql://root:@doris-fe:9030/ai_observability'
+            db.session.commit()
+            print('Doris database driver updated to PyMySQL.')
+        else:
+            print('Doris database already uses PyMySQL.')
         print('Doris database already registered.')
 "
 

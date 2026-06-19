@@ -174,7 +174,10 @@ services:
     container_name: ai-observability-superset-redis
 
   superset:
-    image: apache/superset:4.1.1
+    build:
+      context: .
+      dockerfile: docker/superset/Dockerfile
+    image: ai-observability-superset:local
     container_name: ai-observability-superset
     ports:
       - "8088:8088"

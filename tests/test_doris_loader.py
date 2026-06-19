@@ -31,7 +31,26 @@ def test_columns_for_table_supports_executive_weekly_summary():
     assert columns[-1] == "total_ai_cost_amt_1w"
 
 
+def test_columns_for_table_supports_platform_health():
+    columns = columns_for_table("dws_ai_platform_component_health_1d")
+
+    assert columns == [
+        "date",
+        "component",
+        "metric_name",
+        "metric_value",
+        "threshold",
+        "is_breach",
+    ]
+
+
 def test_normalize_row_converts_week_start_date():
     row = normalize_row({"week_start_date": "2026-01-05", "app_name": "support"})
 
     assert row["week_start_date"].isoformat() == "2026-01-05"
+
+
+def test_normalize_row_converts_release_date():
+    row = normalize_row({"release_date": "2026-02-01", "model_name": "deepseek-chat"})
+
+    assert row["release_date"].isoformat() == "2026-02-01"

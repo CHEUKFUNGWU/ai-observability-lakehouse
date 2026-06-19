@@ -2,9 +2,17 @@
 set -euo pipefail
 
 skip_serving=false
-if [[ "${1:-}" == "--skip-serving" ]]; then
-  skip_serving=true
-fi
+dashboard_only=false
+for arg in "$@"; do
+  case "${arg}" in
+    --skip-serving)
+      skip_serving=true
+      ;;
+    --dashboard-only)
+      dashboard_only=true
+      ;;
+  esac
+done
 
 failures=0
 
@@ -31,10 +39,12 @@ require_running_service() {
   fi
 }
 
-require_running_service postgres
-require_running_service kafka
-require_running_service flink-jobmanager
-require_running_service flink-taskmanager
+if [[ "${dashboard_only}" == false ]]; then
+  require_running_service postgres
+  require_running_service kafka
+  require_running_service flink-jobmanager
+  require_running_service flink-taskmanager
+fi
 
 if [[ "${skip_serving}" == false ]]; then
   require_running_service doris-fe
@@ -43,49 +53,50 @@ if [[ "${skip_serving}" == false ]]; then
   require_running_service grafana
 fi
 
-topics="$(
-  docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --list
-)"
+if [[ "${dashboard_only}" == false ]]; then
+  topics="$(
+    docker compose exec -T kafka /opt/kafka/bin/kafka-topics.sh \
+    --bootstrap-server localhost:9092 \
+    --list
+  )"
 
-for topic in \
-  ods_ai_observability_llm_request_events_di \
-  ods_ai_observability_retrieval_events_di \
-  ods_ai_observability_feedback_events_di \
-  ods_ai_observability_guardrail_events_di \
-  ods_ai_observability_evaluation_events_di \
-  ods_ai_observability_model_deployment_events_di \
-  ods_ai_observability_compliance_access_audit_events_di \
-  ods_ai_observability_compliance_data_retention_events_di \
-  ods_ai_observability_agent_orchestration_events_di \
-  ods_ai_observability_platform_health_metrics_di
-do
-  if grep -qx "${topic}" <<<"${topics}"; then
-    pass "Kafka topic ${topic} exists"
+  for topic in \
+    ods_ai_observability_llm_request_events_di \
+    ods_ai_observability_retrieval_events_di \
+    ods_ai_observability_feedback_events_di \
+    ods_ai_observability_guardrail_events_di \
+    ods_ai_observability_evaluation_events_di \
+    ods_ai_observability_model_deployment_events_di \
+    ods_ai_observability_compliance_access_audit_events_di \
+    ods_ai_observability_compliance_data_retention_events_di \
+    ods_ai_observability_agent_orchestration_events_di \
+    ods_ai_observability_platform_health_metrics_di
+  do
+    if grep -qx "${topic}" <<<"${topics}"; then
+      pass "Kafka topic ${topic} exists"
+    else
+      fail "Kafka topic ${topic} is missing"
+    fi
+  done
+
+  source_count="$(
+    docker compose exec -T postgres psql \
+      -U ai_observability \
+      -d ai_observability \
+      -tAc 'SELECT COUNT(*) FROM public.llm_request_events;' 2>/dev/null \
+      | tr -d '[:space:]' || true
+  )"
+  if [[ "${source_count}" =~ ^[0-9]+$ ]] && (( source_count > 0 )); then
+    pass "Postgres source table has ${source_count} LLM request rows"
   else
-    fail "Kafka topic ${topic} is missing"
+    fail "Postgres source table has no LLM request rows"
   fi
-done
 
-source_count="$(
-  docker compose exec -T postgres psql \
-    -U ai_observability \
-    -d ai_observability \
-    -tAc 'SELECT COUNT(*) FROM public.llm_request_events;' 2>/dev/null \
-    | tr -d '[:space:]' || true
-)"
-if [[ "${source_count}" =~ ^[0-9]+$ ]] && (( source_count > 0 )); then
-  pass "Postgres source table has ${source_count} LLM request rows"
-else
-  fail "Postgres source table has no LLM request rows"
-fi
-
-flink_jobs_json="$(curl -fsS http://localhost:8081/jobs/overview 2>/dev/null || true)"
-if [[ -z "${flink_jobs_json}" ]]; then
-  fail "Flink REST API is not reachable at http://localhost:8081"
-else
-  if python3 - "${flink_jobs_json}" <<'PY'
+  flink_jobs_json="$(curl -fsS http://localhost:8081/jobs/overview 2>/dev/null || true)"
+  if [[ -z "${flink_jobs_json}" ]]; then
+    fail "Flink REST API is not reachable at http://localhost:8081"
+  else
+    if python3 - "${flink_jobs_json}" <<'PY'
 import json
 import sys
 
@@ -122,10 +133,11 @@ if missing:
     print("\n".join(missing))
     sys.exit(1)
 PY
-  then
-    pass "Flink DWD and DWS streaming jobs are running"
-  else
-    fail "Flink DWD/DWS streaming jobs are not both running"
+    then
+      pass "Flink DWD and DWS streaming jobs are running"
+    else
+      fail "Flink DWD/DWS streaming jobs are not both running"
+    fi
   fi
 fi
 

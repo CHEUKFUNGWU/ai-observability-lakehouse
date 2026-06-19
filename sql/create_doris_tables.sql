@@ -576,7 +576,7 @@ CREATE TABLE IF NOT EXISTS ai_observability.dim_user_df
     user_id VARCHAR(128) NOT NULL,
     user_name VARCHAR(256) NOT NULL,
     team_id VARCHAR(128) NOT NULL,
-    role VARCHAR(128) NOT NULL,
+    `role` VARCHAR(128) NOT NULL,
     ai_access_tier VARCHAR(64) NOT NULL,
     status VARCHAR(32) NOT NULL
 )
