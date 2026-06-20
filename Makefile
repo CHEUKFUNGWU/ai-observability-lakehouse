@@ -1,4 +1,4 @@
-.PHONY: test lint pipeline infra-light infra-serving infra-dashboard infra-stop init-superset dashboard-stop seed-data flink-up flink-submit flink-jobs flink-savepoint flink-cancel flink-restore batch-backfill sync-doris health demo demo-streaming demo-serving clean
+.PHONY: test lint pipeline infra-light infra-serving infra-dashboard infra-stop init-superset dashboard-stop seed-data flink-up flink-submit flink-submit-standalone flink-jobs flink-savepoint flink-cancel flink-restore batch-backfill sync-doris health demo demo-streaming demo-serving gravitino-up gravitino-status gravitino-catalogs clean
 
 test:
 	uv run pytest -v
@@ -10,9 +10,10 @@ pipeline:
 	uv run python -m scripts.spark_paimon_backfill --input data/raw/mock_llm_requests/events.jsonl
 
 infra-light:
-	docker compose up -d postgres kafka flink-jobmanager flink-taskmanager
+	docker compose up -d postgres kafka gravitino flink-jobmanager flink-taskmanager
 	scripts/prepare_flink_warehouse.sh
 	scripts/create_kafka_topics.sh
+	bash scripts/init_gravitino.sh
 
 infra-serving:
 	docker compose up -d doris-fe doris-be doris-init
@@ -43,6 +44,17 @@ flink-up:
 flink-submit:
 	scripts/run_flink_sql_sequence.sh \
 	  flink/sql/00_catalogs.sql \
+	  flink/sql/01_source_postgres_cdc.sql \
+	  flink/sql/02_ods_kafka_tables.sql \
+	  flink/sql/03_dwd_paimon_tables.sql \
+	  flink/sql/04_dws_paimon_tables.sql \
+	  flink/sql/10_ingest_ods_to_kafka.sql \
+	  flink/sql/20_build_dwd_from_kafka_ods.sql \
+	  flink/sql/30_build_dws_from_dwd.sql
+
+flink-submit-standalone:
+	scripts/run_flink_sql_sequence.sh \
+	  flink/sql/00_catalogs_standalone.sql \
 	  flink/sql/01_source_postgres_cdc.sql \
 	  flink/sql/02_ods_kafka_tables.sql \
 	  flink/sql/03_dwd_paimon_tables.sql \
@@ -89,6 +101,18 @@ demo-streaming:
 
 demo-serving:
 	scripts/run_serving_demo.sh
+
+gravitino-up:
+	docker compose up -d gravitino
+	@echo "Waiting for Gravitino to start..."
+	@sleep 5
+	bash scripts/init_gravitino.sh
+
+gravitino-status:
+	curl -sf http://localhost:8090/api/version | python3 -m json.tool
+
+gravitino-catalogs:
+	curl -sf http://localhost:8090/api/metalakes/ai_observability/catalogs | python3 -m json.tool
 
 clean:
 	rm -rf data/

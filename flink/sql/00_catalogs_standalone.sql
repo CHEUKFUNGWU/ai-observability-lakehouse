@@ -1,9 +1,8 @@
--- Flink SQL catalog bootstrap — Gravitino-managed Paimon catalog.
+-- Flink SQL catalog bootstrap — direct Paimon (no Gravitino).
 
 CREATE CATALOG paimon_lake WITH (
-    'type' = 'gravitino',
-    'gravitino.metalake' = 'ai_observability',
-    'gravitino.uri' = 'http://gravitino:8090'
+    'type' = 'paimon',
+    'warehouse' = 'file:///workspace/data/paimon'
 );
 
 CREATE DATABASE IF NOT EXISTS paimon_lake.ods;

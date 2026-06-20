@@ -20,6 +20,19 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./sql/source_postgres_schema.sql:/docker-entrypoint-initdb.d/01_source_postgres_schema.sql:ro
 
+  gravitino:
+    image: apache/gravitino:1.2.0
+    container_name: ai-observability-gravitino
+    ports:
+      - "8090:8090"
+    environment:
+      GRAVITINO_MEM: "-Xms512m -Xmx512m -XX:MaxMetaspaceSize=256m"
+    volumes:
+      - paimon_warehouse:/workspace/data/paimon
+      - ./config/gravitino/gravitino.conf:/opt/gravitino/conf/gravitino.conf:ro
+    depends_on:
+      - postgres
+
   flink-jobmanager:
     build:
       context: .
@@ -50,6 +63,7 @@ services:
     depends_on:
       - postgres
       - kafka
+      - gravitino
 
   flink-taskmanager:
     image: ai-observability-flink:1.20-paimon
@@ -75,6 +89,7 @@ services:
       - paimon_warehouse:/workspace/data/paimon
     depends_on:
       - flink-jobmanager
+      - gravitino
 
   flink-sql-client:
     image: ai-observability-flink:1.20-paimon
