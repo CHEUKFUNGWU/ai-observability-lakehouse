@@ -15,6 +15,7 @@ These services are infrastructure processes. They keep running until stopped:
 | --- | --- | --- |
 | `postgres` | Operational source database with logical WAL enabled | `make infra-light` |
 | `kafka` | Real-time ODS buffer and replay log | `make infra-light` |
+| `gravitino` | Metadata service and Web UI for the shared Paimon catalog | `make infra-light` or `make gravitino-up` |
 | `flink-jobmanager` | Flink control plane and REST API | `make infra-light` |
 | `flink-taskmanager` | Flink worker slots for streaming SQL jobs | `make infra-light` |
 | `doris-fe` | Doris SQL frontend, only needed for serving checks | `make infra-serving` |
@@ -72,6 +73,25 @@ make flink-jobs
 Avoid repeatedly running `make flink-submit` against an already-running cluster
 unless you intentionally want duplicate streaming jobs. Check `make flink-jobs`
 first.
+
+### Gravitino metadata service
+
+Start only Gravitino and initialize the `ai_observability` metalake plus the
+`paimon_lake` catalog:
+
+```bash
+make gravitino-up
+```
+
+The initializer is idempotent, so it is safe to rerun after a container restart.
+Check the API and catalog registration with:
+
+```bash
+make gravitino-status
+make gravitino-catalogs
+```
+
+Open the Web V2 UI at `http://localhost:8090`.
 
 ### Finite batch and serving tasks
 

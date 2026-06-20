@@ -210,9 +210,10 @@ Build and start the local Flink runtime manually:
 
 ```bash
 docker compose build flink-jobmanager
-docker compose up -d postgres kafka flink-jobmanager flink-taskmanager
+docker compose up -d postgres kafka gravitino flink-jobmanager flink-taskmanager
 scripts/prepare_flink_warehouse.sh
 scripts/create_kafka_topics.sh
+scripts/init_gravitino.sh
 ```
 
 Load local JSONL events into the Postgres operational source table:
@@ -246,6 +247,26 @@ The Flink Web UI is available at:
 
 ```text
 http://localhost:8081
+```
+
+Gravitino manages the shared Paimon metadata under the
+`ai_observability` metalake. Start and initialize it independently with:
+
+```bash
+make gravitino-up
+```
+
+Verify the server and registered catalogs with:
+
+```bash
+make gravitino-status
+make gravitino-catalogs
+```
+
+The Gravitino Web V2 UI is available at:
+
+```text
+http://localhost:8090
 ```
 
 ## 9. Spark Backfill and Validation

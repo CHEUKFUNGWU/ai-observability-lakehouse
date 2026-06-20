@@ -20,6 +20,30 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./sql/source_postgres_schema.sql:/docker-entrypoint-initdb.d/01_source_postgres_schema.sql:ro
 
+  gravitino:
+    image: apache/gravitino:1.2.0
+    container_name: ai-observability-gravitino
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      GRAVITINO_MEM: "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m"
+      GRAVITINO_USE_WEB_V2: "true"
+    volumes:
+      - gravitino_data:/root/gravitino/data
+      - paimon_warehouse:/workspace/data/paimon
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fsS
+          -H 'Accept: application/vnd.gravitino.v1+json'
+          http://localhost:8090/api/version >/dev/null
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 20s
+
   flink-jobmanager:
     build:
       context: .
@@ -210,6 +234,7 @@ services:
   
 volumes:
   postgres_data:
+  gravitino_data:
   paimon_warehouse:
   doris_fe_data:
   doris_be_data:

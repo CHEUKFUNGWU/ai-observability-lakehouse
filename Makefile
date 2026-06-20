@@ -1,4 +1,4 @@
-.PHONY: test lint pipeline infra-light infra-serving infra-dashboard infra-stop init-superset dashboard-stop seed-data flink-up flink-submit flink-jobs flink-savepoint flink-cancel flink-restore batch-backfill sync-doris health demo demo-streaming demo-serving clean
+.PHONY: test lint pipeline infra-light infra-serving infra-dashboard infra-stop init-superset dashboard-stop seed-data flink-up flink-submit flink-jobs flink-savepoint flink-cancel flink-restore batch-backfill sync-doris health demo demo-streaming demo-serving gravitino-up gravitino-status gravitino-catalogs clean
 
 test:
 	uv run pytest -v
@@ -10,9 +10,10 @@ pipeline:
 	uv run python -m scripts.spark_paimon_backfill --input data/raw/mock_llm_requests/events.jsonl
 
 infra-light:
-	docker compose up -d postgres kafka flink-jobmanager flink-taskmanager
+	docker compose up -d postgres kafka gravitino flink-jobmanager flink-taskmanager
 	scripts/prepare_flink_warehouse.sh
 	scripts/create_kafka_topics.sh
+	scripts/init_gravitino.sh
 
 infra-serving:
 	docker compose up -d doris-fe doris-be doris-init
@@ -89,6 +90,16 @@ demo-streaming:
 
 demo-serving:
 	scripts/run_serving_demo.sh
+
+gravitino-up:
+	docker compose up -d --wait gravitino
+	scripts/init_gravitino.sh
+
+gravitino-status:
+	curl -fsS -H 'Accept: application/vnd.gravitino.v1+json' http://localhost:8090/api/version | python3 -m json.tool
+
+gravitino-catalogs:
+	curl -fsS -H 'Accept: application/vnd.gravitino.v1+json' http://localhost:8090/api/metalakes/ai_observability/catalogs | python3 -m json.tool
 
 clean:
 	rm -rf data/

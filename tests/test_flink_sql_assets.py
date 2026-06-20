@@ -347,6 +347,15 @@ def test_flink_sql_sequence_runner_keeps_catalog_in_one_session():
     assert "docker compose run -T --rm flink-sql-client" in script
     assert "/opt/flink/bin/sql-client.sh" in script
     assert "-f \"/workspace/${tmp_file}\"" in script
+    assert "PIPESTATUS[0]" in script
+    assert "\\[ERROR\\]" in script
+
+
+def test_dws_session_duration_uses_a_flink_supported_timestampdiff_unit():
+    sql = read_asset("flink/sql/30_build_dws_from_dwd.sql")
+
+    assert "TIMESTAMPDIFF(MILLISECOND" not in sql
+    assert "TIMESTAMPDIFF(SECOND, MIN(created_at), MAX(created_at)) * 1000" in sql
 
 
 def test_flink_savepoint_restore_helpers_are_available():
