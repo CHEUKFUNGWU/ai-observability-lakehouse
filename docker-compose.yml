@@ -32,7 +32,6 @@ services:
     volumes:
       - gravitino_data:/root/gravitino/data
       - paimon_warehouse:/workspace/data/paimon
-      - ./config/gravitino/gravitino.conf:/root/gravitino/conf/gravitino.conf:ro
     healthcheck:
       test:
         - CMD-SHELL

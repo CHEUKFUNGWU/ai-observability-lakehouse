@@ -19,6 +19,7 @@ def test_compose_defines_a_health_checked_gravitino_service():
     assert "http://localhost:8090/api/version" in compose
     assert "gravitino_data:/root/gravitino/data" in compose
     assert "paimon_warehouse:/workspace/data/paimon" in compose
+    assert "gravitino.conf:ro" not in compose
 
 
 def test_gravitino_initializer_is_strict_and_idempotent():
