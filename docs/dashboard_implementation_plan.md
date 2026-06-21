@@ -449,27 +449,29 @@ curl -s http://localhost:3001/api/health   # Grafana health
 
 ### Phase 2: Superset AI Overview Dashboard (Day 2)
 
-Build the main dashboard manually in the Superset UI:
+Build the main dashboard in Superset and persist it as a repo-managed asset:
 
 1. Open `http://localhost:8088`, login as admin/admin.
 2. Go to SQL Lab, verify Doris connection by running Q1.
-3. Create each chart from Q1-Q3, Q8-Q12 using the chart builder.
+3. Create each chart from Q1-Q3, Q8-Q12 using the chart builder or the
+   deterministic provisioning script.
 4. Arrange charts into the AI Observability Overview dashboard.
-5. Add date range, app_name, and feature_name filters.
-6. Export the dashboard as JSON for version control.
+5. Add date range, app_name, and feature_name filters when native filters are
+   required.
+6. Export the dashboard as an official Superset bundle for version control.
 
-Save the export to `config/superset/dashboards/ai_overview.json`.
+Save the export to `config/superset/dashboards/ai_overview.zip`.
 
 ### Phase 3: Superset Compliance + Agent Dashboards (Day 3)
 
 1. Create charts from Q4-Q6.
 2. Build the Compliance & Governance dashboard (Q4, Q5).
 3. Build the Agent Orchestration dashboard (Q6).
-4. Export both as JSON.
+4. Export both as official Superset bundles.
 
 Save exports to:
-- `config/superset/dashboards/compliance.json`
-- `config/superset/dashboards/agent_orchestration.json`
+- `config/superset/dashboards/compliance.zip`
+- `config/superset/dashboards/agent_orchestration.zip`
 
 ### Phase 4: Grafana Platform Health Dashboard (Day 4)
 
@@ -510,8 +512,9 @@ fi
 
 ## 8. Dashboard JSON Version Control
 
-Exported dashboard JSON files should be committed to the repository so that
-dashboards are reproducible without manual setup.
+Exported Superset dashboard bundles and Grafana dashboard JSON files should be
+committed to the repository so that dashboards are reproducible without manual
+setup.
 
 ```
 config/
@@ -525,24 +528,24 @@ config/
 │               └── platform_health.json
 └── superset/
     └── dashboards/
-        ├── ai_overview.json
-        ├── compliance.json
-        └── agent_orchestration.json
+        ├── ai_overview.zip
+        ├── compliance.zip
+        └── agent_orchestration.zip
 ```
 
 Grafana dashboards are auto-loaded from the `json/` directory on container
 startup via the provisioning system.
 
-Superset dashboards require an import step. Add to `scripts/init_superset.sh`:
+Superset 4.1 uses ZIP/YAML dashboard bundles rather than legacy JSON exports.
+The current repo uses `scripts/provision_superset_dashboards.py` as the source
+of truth and can emit versioned ZIP bundles from that spec when needed:
 
 ```bash
-for dashboard_file in config/superset/dashboards/*.json; do
-  if [[ -f "${dashboard_file}" ]]; then
-    echo "Importing dashboard: ${dashboard_file}"
-    docker compose exec -T superset superset import-dashboards \
-      -p "/app/${dashboard_file}" || true
-  fi
-done
+docker compose exec -T superset \
+  python3 /app/bootstrap-scripts/provision_superset_dashboards.py --provision
+
+uv run python -m scripts.provision_superset_dashboards \
+  --write-bundles config/superset/dashboards
 ```
 
 ---

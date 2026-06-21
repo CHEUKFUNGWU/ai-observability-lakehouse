@@ -5,6 +5,16 @@ checked, stopped, and recovered. It intentionally separates always-on streaming
 work from finite batch and serving-layer work so local development does not need
 to keep the full stack running.
 
+## Prerequisites
+
+- Docker Engine/Desktop with Docker Compose v2.
+- `uv` and Python 3.11+ for local generators, Spark jobs, and tests.
+- `curl`; database clients run inside containers, so host MySQL/psql clients are optional.
+- Recommended: at least 12 GB free memory for the full stack.
+
+Copy `.env.example` to `.env` only for live DeepSeek calls. Never commit `.env`
+or a real API key.
+
 ## Runtime Model
 
 ### Long-running services
@@ -15,10 +25,13 @@ These services are infrastructure processes. They keep running until stopped:
 | --- | --- | --- |
 | `postgres` | Operational source database with logical WAL enabled | `make infra-light` |
 | `kafka` | Real-time ODS buffer and replay log | `make infra-light` |
+| `gravitino` | Metadata service and Web V2 UI for the shared Paimon catalog | `make infra-light` or `make gravitino-up` |
 | `flink-jobmanager` | Flink control plane and REST API | `make infra-light` |
 | `flink-taskmanager` | Flink worker slots for streaming SQL jobs | `make infra-light` |
 | `doris-fe` | Doris SQL frontend, only needed for serving checks | `make infra-serving` |
 | `doris-be` | Doris storage/query backend, only needed for serving checks | `make infra-serving` |
+| `superset-metadata`, `superset-redis`, `superset` | BI metadata, cache, and analytics UI | `make infra-dashboard` |
+| `grafana` | Operational dashboard UI | `make infra-dashboard` |
 
 Use the light runtime for most stream-processing development:
 
@@ -36,6 +49,12 @@ Stop all local services when they are not needed:
 
 ```bash
 make infra-stop
+```
+
+Stop only dashboard services while keeping Doris and the streaming path running:
+
+```bash
+make dashboard-stop
 ```
 
 ### Long-running Flink streaming jobs
@@ -73,6 +92,30 @@ Avoid repeatedly running `make flink-submit` against an already-running cluster
 unless you intentionally want duplicate streaming jobs. Check `make flink-jobs`
 first.
 
+### Gravitino metadata service
+
+`make infra-light` starts Gravitino and runs the idempotent initializer. Start
+or repair only the metadata service with:
+
+```bash
+make gravitino-up
+```
+
+The initializer creates the `ai_observability` metalake and registers the
+`paimon_lake` relational catalog backed by
+`file:///workspace/data/paimon`. Re-running it after a restart is safe.
+
+Verify the API and registered catalogs:
+
+```bash
+make gravitino-status
+make gravitino-catalogs
+```
+
+Open Web V2 at `http://localhost:8090`. Gravitino metadata persists in the
+`gravitino_data` volume; the Paimon data and snapshots remain in the separate
+shared Paimon warehouse volume.
+
 ### Finite batch and serving tasks
 
 These commands are finite tasks. They should start, complete, and exit:
@@ -82,6 +125,7 @@ These commands are finite tasks. They should start, complete, and exit:
 | `make seed-data` | Generate mock LLM and Agent events and load LLM source rows into Postgres |
 | `make batch-backfill` | Build Spark-derived ADS/dimension assets |
 | `make sync-doris` | Create Doris tables/catalogs and load DWS metrics into Doris |
+| `make init-superset` | Initialize Superset, register Doris, and provision dashboards |
 | `make health` | Check that the running data path is healthy |
 
 Airflow or another scheduler would only be useful around finite tasks like
@@ -113,8 +157,44 @@ Run the serving/query phase:
 make demo-serving
 ```
 
-This starts Doris, runs the Spark/Doris serving steps, checks the full stack, and
-prints the dashboard query preview.
+This starts Doris, builds bounded dashboard demo datasets, starts Superset and
+Grafana, provisions the repository-managed dashboards, checks the serving stack,
+and prints the dashboard query preview. It intentionally loads a representative
+subset rather than all 44 warehouse tables.
+
+## Dashboard Operations
+
+Start the dashboard dependencies after Doris is ready and data has been synced:
+
+```bash
+make infra-dashboard
+make init-superset
+```
+
+| UI | URL | Local demo credentials |
+| --- | --- | --- |
+| Superset | `http://localhost:8088` | `admin` / `admin` |
+| Grafana | `http://localhost:3001` | `admin` / `admin` |
+
+These credentials and the Compose secret are for localhost demos only. Shared or
+production deployments must inject unique secrets, configure TLS/RBAC, restrict
+network exposure, and use a non-root Doris account.
+
+Superset dashboards are provisioned deterministically from
+`scripts/provision_superset_dashboards.py`. Generate auditable Superset 4.1
+ZIP/YAML bundles from the same specification with:
+
+```bash
+uv run python -m scripts.provision_superset_dashboards \
+  --write-bundles config/superset/dashboards
+```
+
+Grafana loads its datasource and dashboard JSON automatically from
+`config/grafana/provisioning/`. Run only the Doris/dashboard health checks with:
+
+```bash
+scripts/check_pipeline_health.sh --dashboard-only
+```
 
 ## Health Checks
 
@@ -140,6 +220,7 @@ The health check verifies:
 - Hourly feature and daily session DWS jobs are running.
 - Tier 3 compliance, orchestration and platform-health topics and jobs are running.
 - Doris FE is queryable when serving checks are enabled.
+- Superset and Grafana health endpoints are reachable when serving checks are enabled.
 
 This is a fast operational check. It does not replace deeper table-level
 verification queries such as `flink/sql/91_verify_dwd_count.sql` and

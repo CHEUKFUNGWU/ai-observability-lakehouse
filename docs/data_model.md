@@ -1,517 +1,169 @@
-# Data Model
+# 数据模型
 
-## 1. Overview
+> 状态：当前实现（2026-06-21）。字段与粒度事实来源依次为 `app/warehouse_contract.py`、Flink/Paimon SQL、Doris DDL 和 Spark 作业。
 
-This project models AI application observability data around two implemented runtime domains:
+## 1. 模型原则
 
-1. LLM request events
-2. Agent runtime events
+- 使用通用 AI observability 语义，不绑定 Dify、LangChain 或单一 Agent runtime。
+- 事实表一行代表一个不可再分的业务事件；聚合表名称和主键直接表达 grain 与 period。
+- ODS 保留源语义，DWD 负责类型与质量，DWS 负责复用聚合，ADS 负责具体消费，DIM 提供参考上下文。
+- ID 是字符串；事件明细按 `date` 分区；日快照维度使用 `df`；日聚合使用 `1d`。
+- 原始 prompt/response 等敏感大文本留在受控源/ODS，DWD 优先保存 hash、size 和统计字段。
 
-The model intentionally avoids Dify-specific names such as `workflow_run` or `node_execution`. Instead, it uses generic observability concepts that fit internal customer-support agents, research agents, coding agents and OpenAI/Claude-style agent runtimes:
+## 2. 分层与物理实现
 
-- `agent_run`: one end-to-end agent task
-- `agent_span`: one step inside an agent run, such as planning, retrieval, LLM call, tool call or final response
-- `agent_tool_call`: one concrete tool invocation with arguments and result payload
-- `llm_request`: one concrete model API call, optionally linked back to an agent run and span
+| 层 | 主要实现 | 语义 |
+|---|---|---|
+| Source/Raw | 应用事件、DeepSeek、Hermes、mock、JSONL、Postgres | 未进入仓库前的源数据 |
+| ODS | Kafka topics、本地 Parquet landing | 源对齐事件 + 技术元数据，无业务聚合 |
+| Metadata | Gravitino `ai_observability.paimon_lake` | 统一管理 Paimon namespace、table 和 catalog 元数据 |
+| DWD | Paimon、Doris、本地 Parquet | typed、validated 行级事实 |
+| DWS | Paimon、Doris、本地 Parquet | 可复用的小时/日/会话指标 |
+| DIM | Doris/Paimon/Parquet snapshot | 模型、组织、Prompt、知识库和规则上下文 |
+| ADS | Doris/Parquet | SLA、预算、质量、异常和管理报告 |
 
-The current warehouse layers are:
+Gravitino 不新增仓库业务层，也不改变 44 张物理表的命名与粒度。它管理 `paimon_lake` 的元数据入口；Paimon 仍保存表数据、快照和文件。
 
-```text
-Data sources / collectors
-  -> Raw JSONL files
-  -> Kafka ODS or raw landing
-  -> DWD typed business event tables
-  -> DWS dws_ai_llm_feature_request_1d
-  -> DWS dws_ai_agent_agent_run_1d
-  -> DWS dws_ai_agent_tool_tool_call_1d
+## 3. ODS 事件入口
+
+| ODS 表/topic | 源事件 |
+|---|---|
+| `ods_ai_observability_llm_request_events_di` | LLM request |
+| `ods_ai_observability_agent_run_events_di` | Agent run |
+| `ods_ai_observability_agent_span_events_di` | Agent span |
+| `ods_ai_observability_agent_tool_call_events_di` | Tool call |
+| `ods_ai_observability_retrieval_events_di` | Retrieval request |
+| `ods_ai_observability_feedback_events_di` | Feedback action |
+| `ods_ai_observability_guardrail_events_di` | Guardrail check |
+| `ods_ai_observability_evaluation_events_di` | Evaluation judgment |
+| `ods_ai_observability_model_deployment_events_di` | Model deployment action |
+| `ods_ai_observability_compliance_access_audit_events_di` | Access audit event |
+| `ods_ai_observability_compliance_data_retention_events_di` | Retention enforcement event |
+| `ods_ai_observability_agent_orchestration_events_di` | Inter-agent handoff |
+| `ods_ai_observability_platform_health_metrics_di` | Platform health observation |
+
+默认 Postgres CDC 只自动生产第一个 LLM topic；其他 topic 需要应用 producer、采集器或显式加载流程。
+
+## 4. DWD 事实表（12）
+
+| 表 | 粒度 | 主 ID/关联 |
+|---|---|---|
+| `dwd_ai_llm_request_di` | 每个 provider request attempt result 一行 | `request_id`; `trace_id`, `run_id`, `span_id` |
+| `dwd_ai_agent_run_di` | 每个端到端 Agent task/run 一行 | `run_id`, `trace_id` |
+| `dwd_ai_agent_span_di` | 每个 Agent runtime span 一行 | `span_id`; `run_id`, `parent_span_id` |
+| `dwd_ai_agent_tool_call_di` | 每次具体 tool invocation 一行 | `tool_call_id`; `run_id`, `span_id` |
+| `dwd_ai_retrieval_request_di` | 每次 retrieval request 一行 | `retrieval_id`; `request_id`, `run_id` |
+| `dwd_ai_feedback_action_di` | 每次 feedback action 一行 | `feedback_id`; `request_id`, `run_id` |
+| `dwd_ai_guardrail_check_di` | 每次 guardrail rule evaluation 一行 | `guardrail_check_id`; `request_id`, `run_id` |
+| `dwd_ai_evaluation_judgment_di` | 每次 evaluation judgment 一行 | `evaluation_id`; `request_id`, `run_id` |
+| `dwd_ai_model_deployment_di` | 每次 model deployment action 一行 | `deployment_id`, model/version |
+| `dwd_ai_compliance_access_audit_di` | 每次访问尝试一行 | `audit_event_id`, `user_id` |
+| `dwd_ai_compliance_data_retention_di` | 每次分区留存动作一行 | `retention_event_id`, table/partition |
+| `dwd_ai_agent_orchestration_di` | 每次 inter-agent handoff 一行 | `orchestration_id`; parent/child run |
+
+### 4.1 核心运行时关系
+
+```mermaid
+erDiagram
+    DWD_AI_AGENT_RUN_DI ||--o{ DWD_AI_AGENT_SPAN_DI : run_id
+    DWD_AI_AGENT_RUN_DI ||--o{ DWD_AI_LLM_REQUEST_DI : run_id
+    DWD_AI_AGENT_SPAN_DI ||--o{ DWD_AI_LLM_REQUEST_DI : span_id
+    DWD_AI_AGENT_SPAN_DI ||--o{ DWD_AI_AGENT_TOOL_CALL_DI : span_id
+    DWD_AI_LLM_REQUEST_DI ||--o{ DWD_AI_RETRIEVAL_REQUEST_DI : request_id
+    DWD_AI_LLM_REQUEST_DI ||--o{ DWD_AI_FEEDBACK_ACTION_DI : request_id
+    DWD_AI_LLM_REQUEST_DI ||--o{ DWD_AI_GUARDRAIL_CHECK_DI : request_id
+    DWD_AI_LLM_REQUEST_DI ||--o{ DWD_AI_EVALUATION_JUDGMENT_DI : request_id
 ```
 
----
+这些是逻辑关联，不是数据库外键。迟到事件、异步 evaluation/feedback 和跨系统 ID 映射必须由接入方处理。
 
-## 2. Source vs ODS vs DWD vs DWS/ADS
+## 5. DWS 汇总表（16）
 
-The mock generators and live API collectors are not warehouse layers. They are data sources.
+| 表 | 粒度 |
+|---|---|
+| `dws_ai_llm_feature_request_1d` | 每日 app × feature × model |
+| `dws_ai_llm_feature_request_1h` | 每小时 app × feature × model |
+| `dws_ai_llm_session_request_1d` | 每日 app × feature 的 session 汇总 |
+| `dws_ai_llm_feature_env_request_1d` | 每日 app × feature × model × environment |
+| `dws_ai_llm_region_request_1d` | 每日 region × environment × app × model |
+| `dws_ai_agent_agent_run_1d` | 每日 app × agent × task type |
+| `dws_ai_agent_tool_tool_call_1d` | 每日 agent × tool × tool type |
+| `dws_ai_agent_team_run_1d` | 每日 team × app × agent × task type |
+| `dws_ai_agent_orchestration_handoff_1d` | 每日 parent agent × child agent × handoff type |
+| `dws_ai_retrieval_knowledge_base_request_1d` | 每日 app × knowledge base × embedding model × strategy |
+| `dws_ai_feedback_feature_action_1d` | 每日 app × feature × agent |
+| `dws_ai_guardrail_rule_check_1d` | 每日 app × rule category × action |
+| `dws_ai_cost_team_request_1d` | 每日 team × app × model |
+| `dws_ai_evaluation_feature_judgment_1d` | 每日 app × feature × evaluation dimension × evaluated model |
+| `dws_ai_prompt_version_request_1d` | 每日 prompt × version × model |
+| `dws_ai_platform_component_health_1d` | 每日 component × metric |
 
-| Layer | Current Implementation | Responsibility |
+DWS 原则上保存可直接聚合的 count、token、amount、duration、score 和 distinct count。成功率、错误率、满意度等 rate 默认由查询/ADS 使用分子和分母计算。
+
+## 6. DIM 维度表（7）
+
+| 表 | 粒度/用途 |
+|---|---|
+| `dim_model_df` | 每个模型定义快照；provider、能力、价格、deprecated 状态 |
+| `dim_model_version_df` | 每个 model version 快照；部署状态和 current-prod 标志 |
+| `dim_prompt_version_df` | 每个 prompt/version 快照；owner、状态、A/B group |
+| `dim_team_df` | 每个团队快照；department、cost center、预算 |
+| `dim_user_df` | 每个用户快照；team 归属和访问层级 |
+| `dim_knowledge_base_df` | 每个知识库快照；类型、文档数和更新时间 |
+| `dim_guardrail_rule_df` | 每个 guardrail rule 快照；类别、默认严重度和 owner |
+
+## 7. ADS 应用表（9）
+
+| 表 | 粒度/用途 |
+|---|---|
+| `ads_observability_cost_feature_anomaly` | feature 成本异常 |
+| `ads_observability_sla_feature_report` | feature 日 SLA 结果 |
+| `ads_observability_prompt_prompt_version_metrics` | Prompt 版本效果消费表 |
+| `ads_observability_retrieval_daily_quality` | 检索命中、零结果和时延质量 |
+| `ads_observability_feedback_daily_satisfaction` | 满意度与再生成风险 |
+| `ads_observability_guardrail_daily_violation` | 规则触发、阻断和策略时延 |
+| `ads_observability_cost_daily_budget` | 团队/app MTD、预测和预算 breach |
+| `ads_observability_cost_monthly_chargeback` | 团队/cost center 月度分摊 |
+| `ads_observability_executive_weekly_summary` | app 周度跨域管理摘要 |
+
+## 8. 核心字段族
+
+不同事实按适用性复用以下字段族：
+
+| 字段族 | 典型字段 | 说明 |
 |---|---|---|
-| Source | mock generator, DeepSeek live collector, Hermes trajectory parser | Produce application/runtime events |
-| Raw | JSONL files under `data/raw/` | Local landing files for generated or collected events |
-| ODS | Kafka topics plus selected Parquet landings under `data/warehouse/ods/` | Preserve source event fields and add technical metadata |
-| DWD | Paimon `paimon_lake.dwd.*` plus local Parquet development outputs | Cast types, normalize fields and apply row-level validation |
-| DWS | Paimon `paimon_lake.dws.*` plus local Parquet under `data/warehouse/dws/` | Reusable additive daily summaries |
-| ADS | Doris/local derived outputs under `data/warehouse/ads/` | Application-specific marts such as SLA, prompt-version, and anomaly reports |
-
-ODS deliberately does not calculate business metrics. It keeps source-aligned data stable so DWD logic can evolve without coupling directly to collectors.
-
----
-
-## 3. ODS Tables
-
-### Business Meaning
-
-ODS tables are source event landing tables. They preserve the raw event fields from JSONL and append technical metadata.
-
-Current ODS outputs:
-
-| Table | Path | Source Event Type |
-|---|---|---|
-| ods_ai_observability_llm_request_events_di | `data/warehouse/ods/ods_ai_observability_llm_request_events_di/events.parquet` | `llm_request` |
-| ods_ai_observability_agent_run_events_di | `data/warehouse/ods/ods_ai_observability_agent_run_events_di/events.parquet` | `agent_run` |
-| ods_ai_observability_agent_span_events_di | `data/warehouse/ods/ods_ai_observability_agent_span_events_di/events.parquet` | `agent_span` |
-| ods_ai_observability_agent_tool_call_events_di | `data/warehouse/ods/ods_ai_observability_agent_tool_call_events_di/events.parquet` | `agent_tool_call` |
-
-### Added ODS Metadata
-
-| Field | Type | Description |
-|---|---|---|
-| source_name | string | Source system or collector name |
-| source_event_type | string | Source event type |
-| ingested_at | timestamp | ODS ingestion timestamp |
-| raw_event_json | string | Original event serialized as JSON |
-
-### Grain
-
-One row per source event.
-
----
-
-## 4. DWD Table: dwd_ai_llm_request_di
-
-### Business Meaning
-
-Each row represents one LLM API request. This table is the source of truth for model usage, latency, token cost, API reliability and prompt/response metadata. Raw prompt and response text stay in ODS/source data; DWD keeps hashes and length fields for safer analytics.
-
-When the request is produced by an Agent, it can be linked to `dwd_ai_agent_run_di` and `dwd_ai_agent_span_di` through `run_id` and `span_id`.
-
-### Fields
-
-| Field | Type | Description |
-|---|---|---|
-| request_id | string | Unique LLM request ID |
-| trace_id | string | Cross-system trace ID |
-| run_id | string | Related Agent run ID |
-| span_id | string | Related Agent span ID |
-| agent_id | string | Agent identifier |
-| agent_name | string | Agent display name |
-| channel | string | Request channel, e.g. api, web, slack |
-| user_id | string | User ID |
-| session_id | string | Session ID |
-| conversation_id | string | Conversation ID |
-| app_name | string | AI application name |
-| feature_name | string | Feature module |
-| prompt_category | string | Prompt category |
-| prompt_id | string | Prompt ID |
-| prompt_version | string | Prompt version |
-| model_name | string | LLM model name |
-| provider | string | API provider, e.g. deepseek |
-| prompt_hash | string | Hash of prompt text for safer deduplication |
-| response_hash | string | Hash of response text |
-| input_chars | int | Prompt character count |
-| output_chars | int | Response character count |
-| prompt_tokens | int | Input tokens |
-| completion_tokens | int | Output tokens |
-| total_tokens | int | Total tokens |
-| request_type | string | chat, completion, embedding or other request type |
-| is_streaming | boolean | Whether the API request used streaming |
-| temperature | double | Sampling temperature |
-| max_tokens | int | Requested max output tokens |
-| finish_reason | string | Provider finish reason |
-| retry_count | int | Number of retries before final result |
-| latency_ms | int | Request latency in milliseconds |
-| status | string | success / error |
-| error_type | string | Error type |
-| http_status | int | HTTP status code |
-| estimated_cost_usd | double | Estimated API cost |
-| mode | string | mock / live / replay |
-| region | string | User or runtime region |
-| environment | string | dev / staging / prod |
-| created_at | timestamp | Request timestamp |
-| date | date | Partition date |
-
-### Grain
-
-One row per provider request attempt result.
-
-### Partition
-
-Partitioned by `date`.
-
-### Contract Ownership
-
-The `llm_request` field list, default handling, and validation rules are owned by `app/warehouse_contract.py`.
-Spark projection, Spark Paimon bootstrap, and contract-oriented SQL tests should reuse that module rather than restating the contract inline.
-
----
-
-## 5. DWD Table: dwd_ai_agent_run_di
-
-### Business Meaning
-
-Each row represents one end-to-end Agent task. Examples:
-
-- A customer-support agent handling one user question
-- A coding agent completing one edit request
-- A research agent answering one investigation task
-- An operations agent running one monitoring or remediation flow
-
-This table is the main fact table for Agent-level success rate, cost, latency and workload volume.
-
-### Fields
-
-| Field | Type | Description |
-|---|---|---|
-| run_id | string | Unique Agent run ID |
-| trace_id | string | Cross-system trace ID |
-| agent_id | string | Agent identifier |
-| agent_name | string | Agent display name |
-| agent_version | string | Agent version |
-| app_name | string | AI application name |
-| user_id | string | User ID |
-| session_id | string | Session ID |
-| conversation_id | string | Conversation ID |
-| task_type | string | Task category, e.g. support_answer, doc_summary |
-| channel | string | Runtime channel, e.g. api, web, slack |
-| toolsets_used | string | JSON string of toolsets or skills enabled for the run |
-| input_text_hash | string | Hash of run input text |
-| output_text_hash | string | Hash of final output text |
-| start_time | timestamp | Run start time |
-| end_time | timestamp | Run end time |
-| duration_ms | int | End-to-end run duration |
-| status | string | success / error |
-| error_type | string | Run-level error type |
-| turn_count | int | Conversation turns handled in the run |
-| llm_call_count | int | Number of LLM calls in the run |
-| tool_call_count | int | Number of tool calls in the run |
-| retrieval_count | int | Number of retrieval steps in the run |
-| total_tokens | int | Total tokens consumed by the run |
-| estimated_cost_usd | double | Estimated total run cost |
-| mode | string | mock / live / replay |
-| region | string | User or runtime region |
-| environment | string | dev / staging / prod |
-| created_at | timestamp | Event creation timestamp |
-| date | date | Partition date |
-
-### Grain
-
-One row per Agent task/run.
-
-### Partition
-
-Partitioned by `date`.
-
----
-
-## 6. DWD Table: dwd_ai_agent_span_di
-
-### Business Meaning
-
-Each row represents one step inside an Agent run. This is similar to a tracing span and is more general than a low-code workflow node.
-
-Common `span_type` values:
-
-- `planning`
-- `retrieval`
-- `llm_call`
-- `tool_call`
-- `final_response`
-
-This table is useful for diagnosing where Agent latency, cost and failures happen.
-
-### Fields
-
-| Field | Type | Description |
-|---|---|---|
-| span_id | string | Unique span ID |
-| parent_span_id | string | Parent span ID, if nested |
-| run_id | string | Related Agent run ID |
-| trace_id | string | Cross-system trace ID |
-| agent_id | string | Agent identifier |
-| span_name | string | Human-readable span name |
-| span_type | string | planning / retrieval / llm_call / tool_call / final_response |
-| span_order | int | Step order inside the run |
-| start_time | timestamp | Span start time |
-| end_time | timestamp | Span end time |
-| duration_ms | int | Span duration |
-| status | string | success / error |
-| error_type | string | Span-level error type |
-| retry_count | int | Number of retries for this span |
-| input_size | int | Input size for this step |
-| output_size | int | Output size for this step |
-| model_name | string | Model name if this is an LLM span |
-| tool_name | string | Tool name if this is a tool span |
-| mode | string | mock / live / replay |
-| region | string | User or runtime region |
-| environment | string | dev / staging / prod |
-| created_at | timestamp | Event creation timestamp |
-| date | date | Partition date |
-
-### Grain
-
-One row per Agent runtime step/span.
-
-### Partition
-
-Partitioned by `date`.
-
----
-
-## 7. DWD Table: dwd_ai_agent_tool_call_di
-
-### Business Meaning
-
-Each row represents one concrete Agent tool invocation. This table keeps detail that is too verbose for `dwd_ai_agent_span_di`, especially tool arguments and returned payloads.
-
-Hermes trajectories are a natural source for this table because assistant messages can include `tool_calls`, and subsequent tool messages contain tool results.
-
-### Fields
-
-| Field | Type | Description |
-|---|---|---|
-| tool_call_id | string | Unique tool call ID |
-| span_id | string | Related Agent tool-call span ID |
-| run_id | string | Related Agent run ID |
-| trace_id | string | Cross-system trace ID |
-| agent_id | string | Agent identifier |
-| tool_name | string | Tool name |
-| tool_type | string | function / api / terminal / file / other tool category |
-| arguments_json | string | Tool arguments serialized as JSON or raw argument string |
-| result_text | string | Tool result text |
-| result_size | int | Tool result size in characters |
-| duration_ms | int | Tool call duration if available |
-| status | string | success / error |
-| error_type | string | Tool-level error type |
-| retry_count | int | Number of retries |
-| mode | string | mock / live / replay / hermes |
-| region | string | User or runtime region |
-| environment | string | dev / staging / prod |
-| created_at | timestamp | Event creation timestamp |
-| date | date | Partition date |
-
-### Grain
-
-One row per Agent tool call.
-
-### Partition
-
-Partitioned by `date`.
-
----
-
-## 8. DWS Table: dws_ai_llm_feature_request_1d
-
-### Business Meaning
-
-Daily feature-level LLM metrics for dashboard queries and Doris loading.
-
-### Grouping Keys
-
-| Field | Type | Description |
-|---|---|---|
-| date | date | Metric date |
-| app_name | string | AI application name |
-| feature_name | string | Feature module |
-| model_name | string | LLM model name |
-
-### Metrics
-
-| Field | Type | Description |
-|---|---|---|
-| request_count | long | Total request count |
-| success_count | long | Successful request count |
-| error_count | long | Failed request count |
-| prompt_tokens | long | Total prompt tokens |
-| completion_tokens | long | Total completion tokens |
-| total_tokens | long | Total tokens |
-| estimated_cost_usd | double | Total estimated cost |
-| avg_latency_ms | double | Average latency |
-| max_latency_ms | long | Maximum latency or Flink upper-bound proxy |
-| p95_latency_ms | long | Approximate p95 latency |
-
----
-
-## 9. DWS Table: dws_ai_agent_agent_run_1d
-
-### Business Meaning
-
-Daily Agent-level metrics for operational dashboards. This table answers:
-
-- Which agents are most active?
-- Which task types are slow or expensive?
-- Which agents have high failure rates?
-- Are failures concentrated in spans/tools instead of the whole run?
-
-### Grouping Keys
-
-| Field | Type | Description |
-|---|---|---|
-| date | date | Metric date |
-| app_name | string | AI application name |
-| agent_id | string | Agent identifier |
-| agent_name | string | Agent display name |
-| task_type | string | Task category |
-
-### Metrics
-
-| Field | Type | Description |
-|---|---|---|
-| run_count | long | Total Agent runs |
-| success_count | long | Successful runs |
-| error_count | long | Failed runs |
-| turn_count | long | Total turns |
-| llm_call_count | long | Total LLM calls |
-| tool_call_count | long | Total tool calls |
-| retrieval_count | long | Total retrieval steps |
-| total_tokens | long | Total Agent tokens |
-| estimated_cost_usd | double | Total estimated Agent cost |
-| avg_duration_ms | double | Average Agent run duration |
-| p95_duration_ms | long | Approximate p95 Agent run duration |
-| span_count | long | Total spans under the agent/date |
-| failed_span_count | long | Failed spans |
-| tool_span_count | long | Tool-call spans |
-| llm_span_count | long | LLM-call spans |
-
----
-
-## 10. DWS Table: dws_ai_agent_tool_tool_call_1d
-
-### Business Meaning
-
-Daily tool-level Agent metrics for dashboard queries. This table answers:
-
-- Which tools are called most often?
-- Which tools fail most often?
-- Which tools return the largest payloads?
-- Which agents depend on which tools?
-
-### Grouping Keys
-
-| Field | Type | Description |
-|---|---|---|
-| date | date | Metric date |
-| agent_id | string | Agent identifier |
-| tool_name | string | Tool name |
-| tool_type | string | Tool type |
-
-### Metrics
-
-| Field | Type | Description |
-|---|---|---|
-| tool_call_count | long | Total tool calls |
-| success_count | long | Successful tool calls |
-| error_count | long | Failed tool calls |
-| retry_count | long | Total retries |
-| avg_duration_ms | double | Average tool call duration |
-| p95_duration_ms | long | Approximate p95 tool call duration |
-| avg_result_size | double | Average result payload size |
-| max_result_size | int | Max result payload size |
-
-The core Agent run fact, Agent span fact, Agent tool-call fact, Agent daily summary, and Agent tool daily summary contracts are also owned by `app/warehouse_contract.py`.
-Spark projection and contract-oriented SQL tests should reuse that module rather than restating those field lists inline.
-
----
-
-## 11. Entity Relationship
-
-```text
-dwd_ai_agent_run_di.run_id
-        |
-        +---- dwd_ai_agent_span_di.run_id
-        |
-        +---- dwd_ai_llm_request_di.run_id
-
-dwd_ai_agent_span_di.span_id
-        |
-        +---- dwd_ai_llm_request_di.span_id
-        |
-        +---- dwd_ai_agent_tool_call_di.span_id
-```
-
-The `trace_id` field connects events across system boundaries. The `run_id` connects all events belonging to one Agent task. The `span_id` connects a specific LLM request to a specific Agent step.
-
----
-
-## 12. Hermes Agent Sources
-
-Hermes Agent can feed this model through multiple source paths:
-
-| Source | Location / Interface | Best Use |
-|---|---|---|
-| Batch trajectories | `data/<run_name>/trajectories.jsonl` | Agent runs, spans, toolsets, tool stats and tool calls |
-| Session SQLite | `~/.hermes/state.db` | Historical sessions, messages, token counts and billing |
-| Gateway transcripts | `~/.hermes/sessions/` | Raw conversation transcripts including tool calls |
-| API server events | `/v1/runs/{id}/events` SSE | Near-real-time run lifecycle and tool events |
-| Hooks | `pre_tool_call`, `post_tool_call`, `pre_llm_call`, `post_llm_call` | High-fidelity runtime capture with arguments, results and duration |
-
-The current implementation supports the batch trajectory path first:
-
-```text
-Hermes trajectories.jsonl
-  -> parse_hermes_trajectories.py
-  -> raw agent_run / agent_span / agent_tool_call JSONL
-  -> ODS
-  -> DWD
-```
-
----
-
-## 13. Domain Expansion Tables
-
-Tier 1 expands the runtime observability model beyond LLM and Agent execution:
-
-| Table | Grain | Purpose |
-|---|---|---|
-| `dwd_ai_retrieval_request_di` | One row per retrieval request | Query hash, embedding model, knowledge base, top_k, returned hits and retrieval latency |
-| `dwd_ai_feedback_action_di` | One row per feedback action | Thumbs, ratings, regenerations, reports and response context |
-| `dwd_ai_guardrail_check_di` | One row per guardrail rule evaluation | Rule stage/category, trigger result, action taken, severity and guardrail latency |
-| `dws_ai_retrieval_knowledge_base_request_1d` | One daily row per app, knowledge base, embedding model and strategy | Retrieval volume, zero-result count, hit count, similarity and latency metrics |
-| `dws_ai_feedback_feature_action_1d` | One daily row per app, feature and agent | Feedback volume, positive/negative counts, regeneration/report counts and average rating |
-| `dws_ai_guardrail_rule_check_1d` | One daily row per app, rule category and action | Guardrail check volume, trigger/action counts, latency and distinct users |
-| `dws_ai_llm_feature_request_1h` | One hourly row per app, feature and model | Request, token, cost and latency metrics for near-real-time dashboards |
-| `dws_ai_llm_session_request_1d` | One daily row per app and feature | Session count, turns, tokens, duration and positive-resolution count |
-| `ads_observability_retrieval_daily_quality` | Daily retrieval quality mart | Hit rate, zero-result rate and latency breach flags |
-| `ads_observability_feedback_daily_satisfaction` | Daily satisfaction mart | Satisfaction rate, regeneration rate and breach flags |
-| `ads_observability_guardrail_daily_violation` | Daily guardrail violation mart | Trigger/block rates and policy-latency breach flags |
-
-The retrieval request fact and retrieval daily summary contracts are owned by `app/warehouse_contract.py`.
-Spark projection and contract-oriented SQL tests should reuse that module rather than restating retrieval field lists inline.
-
-The feedback action fact, guardrail check fact, feedback daily summary, and guardrail daily summary contracts are also owned by `app/warehouse_contract.py`.
-Spark projection and contract-oriented SQL tests should reuse that module rather than restating those field lists inline.
-
-The evaluation judgment fact, model deployment fact, compliance facts, agent orchestration fact, evaluation daily summary, agent orchestration daily summary, and platform health daily summary contracts are also owned by `app/warehouse_contract.py`.
-Spark projection and contract-oriented SQL tests should reuse that module rather than restating those field lists inline.
-
-The cost-team, prompt-version, feature-environment, region, agent-team, hourly feature, and session daily summaries are also owned by `app/warehouse_contract.py`.
-Spark summary builders and contract-oriented SQL tests should reuse that module rather than restating those field lists inline.
-
-Tier 2 starts with cost-governance tables:
-
-| Table | Grain | Purpose |
-|---|---|---|
-| `dim_team_df` | One row per team snapshot | Department, cost center, manager and monthly AI budget |
-| `dim_user_df` | One row per user snapshot | User-to-team mapping and AI access tier |
-| `dws_ai_cost_team_request_1d` | One daily row per team, app and model | Team-attributed request count, token count, estimated LLM cost and Agent cost |
-| `ads_observability_cost_daily_budget` | One daily row per team and app | MTD cost, projected month-end spend, budget utilization and breach flag |
-| `ads_observability_cost_monthly_chargeback` | One monthly row per team and cost center | Finance chargeback amount, monthly budget variance and overrun flag |
-| `dwd_ai_evaluation_judgment_di` | One row per evaluation judgment | LLM-as-judge, human, ground-truth or classifier score for a request/run |
-| `dws_ai_evaluation_feature_judgment_1d` | One daily row per app, feature, evaluation dimension and evaluated model | Evaluation volume, pass/fail counts, average score, p10 score and evaluation latency |
-| `dim_prompt_version_df` | One row per prompt version snapshot | Prompt metadata, owner team, release status and A/B group |
-| `dws_ai_prompt_version_request_1d` | One daily row per prompt, version and model | Request volume, success/error counts, latency, tokens, cost and joined evaluation score |
-| `dwd_ai_model_deployment_di` | One row per model deployment action | Deploy, rollback, scale and canary actions with traffic percentage and target environment |
-| `dim_model_version_df` | One row per model version snapshot | Deployment status, first/last deployed timestamps and current-prod marker |
-| `dws_ai_llm_feature_env_request_1d` | One daily row per app, feature, model and environment | Prod/staging/dev split of request volume, success/error counts, tokens, cost and latency |
-| `dws_ai_llm_region_request_1d` | One daily row per region, environment, app and model | Regional request volume, success/error counts, tokens, cost and latency |
-| `dws_ai_agent_team_run_1d` | One daily row per team, app, agent and task type | Team-attributed agent run volume, success/error counts, tokens, cost, duration and span metrics |
-| `ads_observability_executive_weekly_summary` | One weekly row per app | Cross-domain LLM, Agent, retrieval, feedback, guardrail, evaluation and cost summary |
-
-Tier 3 completes the planned compliance, multi-agent and platform-health model:
-
-| Table | Grain | Purpose |
-|---|---|---|
-| `dwd_ai_compliance_access_audit_di` | One row per access attempt | Granted and denied actions on classified AI resources, with hashed source IP |
-| `dwd_ai_compliance_data_retention_di` | One row per retention action on a table partition | Archive, anonymize and delete policy enforcement evidence |
-| `dwd_ai_agent_orchestration_di` | One row per inter-agent handoff | Parent/child run topology, handoff type, payload size, latency and outcome |
-| `dws_ai_agent_orchestration_handoff_1d` | One daily row per parent agent, child agent and handoff type | Handoff volume, outcomes, average latency and p95 latency |
-| `dws_ai_platform_component_health_1d` | One daily row per component and metric | Daily maximum observation, configured threshold and breach state |
-
-All three tiers in the domain expansion plan are implemented. Platform metrics use upper-bound thresholds; `metric_value` is the maximum observed value for the day, so `is_breach` is reproducible as `metric_value > threshold`.
+| Identity | `request_id`, `run_id`, `span_id`, `trace_id` | 唯一标识和跨域关联 |
+| Subject | `app_name`, `feature_name`, `agent_id`, `model_name` | 业务归属 |
+| Context | `user_id`, `session_id`, `region`, `environment` | 用户和运行环境 |
+| Timing | `created_at`, `start_time`, `end_time`, `date` | 事件时间与分区 |
+| Outcome | `status`, `error_type`, `http_status`, `is_*` | 结果和标志 |
+| Usage | `prompt_tokens`, `completion_tokens`, `total_tokens` | 模型使用量 |
+| Cost | `estimated_cost_usd`, budget/chargeback amounts | 估算或财务金额 |
+| Performance | `latency_ms`, `duration_ms`, `retry_count` | 性能和重试 |
+| Privacy-safe payload | `*_hash`, `*_size`, `*_chars` | 避免传播原始正文 |
+
+精确类型、nullable/default 和列顺序不要从本文复制；实现时使用共享 contract 和对应 DDL。
+
+## 9. 时间、迟到与快照
+
+- DWD 使用事件对应的 `date` 分区，而不是处理机器当天日期。
+- Flink 聚合按 event time 和 watermark 工作；当前小时窗口使用 5 秒 watermark，真实环境应按迟到分布调整。
+- 异步 feedback/evaluation 可能晚于 request 到达；session 与 Prompt 质量重算要允许回填。
+- DIM 是日全量语义。历史事实重算必须固定所需快照语义，避免用当前组织/价格覆盖历史口径。
+
+## 10. 指标约束
+
+- `request_count = success_count + error_count` 仅在状态全集严格为 success/error 时成立。
+- rate 使用安全除法：分母为 0 时返回 NULL 或明确约定值，不默认返回 0。
+- 成本注明估算/实际、币种、价格版本和排除项。
+- percentile 注明算法与计算层；不得把 Flink 的 `MAX` 上界标为 p95。
+- 周/月汇总必须由可加和分子分母加权，不能平均日 rate。
+
+详细公式见[指标定义](metric_definitions.md)。
+
+## 11. 生命周期
+
+- ODS/DWD 支持追踪与回放，应比可重建的 DWS/ADS 保留更久。
+- Doris 当前动态月分区配置保留至少过去 12 个月并创建未来 3 个月。
+- Kafka 本地 retention 为 48 小时，仅用于开发；生产回放窗口应与恢复目标一致。
+- 删除、匿名化和归档应产生 `dwd_ai_compliance_data_retention_di` 证据事件。

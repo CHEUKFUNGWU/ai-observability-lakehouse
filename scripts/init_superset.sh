@@ -62,13 +62,8 @@ with app.app_context():
         print('Doris database already registered.')
 "
 
-for dashboard_file in config/superset/dashboards/*.json; do
-  if [[ -f "${dashboard_file}" ]]; then
-    echo "Importing dashboard: ${dashboard_file}"
-    docker compose exec -T superset superset import-dashboards \
-      -p "/app/${dashboard_file}" || true
-  fi
-done
+echo "Provisioning Superset dashboards from repository specs..."
+docker compose exec -T superset python3 /app/bootstrap-scripts/provision_superset_dashboards.py --provision
 
 echo "Superset initialization complete."
 echo "Open http://localhost:8088 (admin / admin)"
