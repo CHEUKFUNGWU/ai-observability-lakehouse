@@ -7,7 +7,8 @@ if [[ $# -lt 1 ]]; then
 fi
 
 tmp_file="flink/sql/.generated_sequence.sql"
-trap 'rm -f "${tmp_file}"' EXIT
+output_file="$(mktemp)"
+trap 'rm -f "${tmp_file}" "${output_file}"' EXIT
 rm -f "${tmp_file}"
 
 for sql_file in "$@"; do
@@ -20,6 +21,20 @@ done
 
 scripts/prepare_flink_warehouse.sh
 
+set +e
 docker compose run -T --rm flink-sql-client \
   /opt/flink/bin/sql-client.sh \
-  -f "/workspace/${tmp_file}"
+  -f "/workspace/${tmp_file}" 2>&1 | tee "${output_file}"
+docker_status=${PIPESTATUS[0]}
+set -e
+
+if [[ ${docker_status} -ne 0 ]]; then
+  exit "${docker_status}"
+fi
+
+# Flink SQL Client can print a statement-level error and still exit with status 0.
+# Treat any such error as a failed sequence so Make/CI cannot report false success.
+if grep -q '\[ERROR\]' "${output_file}"; then
+  echo "ERROR: Flink SQL Client reported one or more failed statements." >&2
+  exit 1
+fi

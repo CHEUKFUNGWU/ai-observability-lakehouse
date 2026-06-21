@@ -74,9 +74,9 @@ def test_catalog_sql_defines_paimon_lake():
     sql = read_asset("flink/sql/00_catalogs.sql")
 
     assert "CREATE CATALOG paimon_lake" in sql
-    assert "'type' = 'gravitino'" in sql
-    assert "'gravitino.metalake' = 'ai_observability'" in sql
-    assert "'gravitino.uri' = 'http://gravitino:8090'" in sql
+    assert "'type' = 'paimon'" in sql
+    assert "'warehouse' = 'file:///workspace/data/paimon'" in sql
+    assert "'type' = 'gravitino'" not in sql
     assert "CREATE DATABASE IF NOT EXISTS paimon_lake.ods" in sql
     assert "CREATE DATABASE IF NOT EXISTS paimon_lake.dwd" in sql
     assert "CREATE DATABASE IF NOT EXISTS paimon_lake.dws" in sql
@@ -308,12 +308,11 @@ def test_flink_dockerfile_installs_paimon_postgres_and_kafka_connectors():
     assert "ARG FLINK_CDC_VERSION=3.2.1" in dockerfile
     assert "ARG FLINK_SHADED_HADOOP_VERSION=2.8.3-10.0" in dockerfile
     assert "ARG FLINK_KAFKA_VERSION=3.3.0-1.20" in dockerfile
-    assert "ARG GRAVITINO_VERSION=1.2.0" in dockerfile
     assert "paimon-flink-1.20" in dockerfile
     assert "flink-sql-connector-postgres-cdc" in dockerfile
     assert "flink-sql-connector-kafka" in dockerfile
     assert "flink-shaded-hadoop-2-uber" in dockerfile
-    assert "gravitino-flink-connector-runtime-1.18_2.12" in dockerfile
+    assert "gravitino-flink-connector-runtime-1.18_2.12" not in dockerfile
     assert "/opt/flink/lib" in dockerfile
 
 
@@ -364,6 +363,15 @@ def test_flink_sql_sequence_runner_keeps_catalog_in_one_session():
     assert "docker compose run -T --rm flink-sql-client" in script
     assert "/opt/flink/bin/sql-client.sh" in script
     assert "-f \"/workspace/${tmp_file}\"" in script
+    assert "PIPESTATUS[0]" in script
+    assert "\\[ERROR\\]" in script
+
+
+def test_dws_session_duration_uses_a_flink_supported_timestampdiff_unit():
+    sql = read_asset("flink/sql/30_build_dws_from_dwd.sql")
+
+    assert "TIMESTAMPDIFF(MILLISECOND" not in sql
+    assert "TIMESTAMPDIFF(SECOND, MIN(created_at), MAX(created_at)) * 1000" in sql
 
 
 def test_flink_savepoint_restore_helpers_are_available():

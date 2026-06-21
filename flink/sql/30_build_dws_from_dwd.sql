@@ -194,7 +194,8 @@ WITH session_metrics AS (
         session_id,
         COUNT(*) AS turn_cnt,
         SUM(total_tokens) AS token_cnt,
-        TIMESTAMPDIFF(MILLISECOND, MIN(created_at), MAX(created_at)) + MAX(latency_ms) AS session_duration_ms
+        TIMESTAMPDIFF(SECOND, MIN(created_at), MAX(created_at)) * 1000
+            + MAX(latency_ms) AS session_duration_ms
     FROM paimon_lake.dwd.dwd_ai_llm_request_di
     GROUP BY `date`, app_name, feature_name, session_id
 ),

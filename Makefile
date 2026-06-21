@@ -13,7 +13,7 @@ infra-light:
 	docker compose up -d postgres kafka gravitino flink-jobmanager flink-taskmanager
 	scripts/prepare_flink_warehouse.sh
 	scripts/create_kafka_topics.sh
-	bash scripts/init_gravitino.sh
+	scripts/init_gravitino.sh
 
 infra-serving:
 	docker compose up -d doris-fe doris-be doris-init
@@ -103,16 +103,14 @@ demo-serving:
 	scripts/run_serving_demo.sh
 
 gravitino-up:
-	docker compose up -d gravitino
-	@echo "Waiting for Gravitino to start..."
-	@sleep 5
-	bash scripts/init_gravitino.sh
+	docker compose up -d --wait gravitino
+	scripts/init_gravitino.sh
 
 gravitino-status:
-	curl -sf http://localhost:8090/api/version | python3 -m json.tool
+	curl -fsS -H 'Accept: application/vnd.gravitino.v1+json' http://localhost:8090/api/version | python3 -m json.tool
 
 gravitino-catalogs:
-	curl -sf http://localhost:8090/api/metalakes/ai_observability/catalogs | python3 -m json.tool
+	curl -fsS -H 'Accept: application/vnd.gravitino.v1+json' http://localhost:8090/api/metalakes/ai_observability/catalogs | python3 -m json.tool
 
 clean:
 	rm -rf data/
