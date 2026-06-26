@@ -23,6 +23,8 @@
 
 - [Benchmark results](benchmark_results.md)
 - [Flink failover test report](failover_test_report.md)
+- [Langfuse 采集层集成可行性调研](langfuse_ingestion_feasibility.md)
+- [Langfuse External Observability Source PRD](langfuse_external_observability_prd.md)
 
 报告描述特定时间和环境的结果，不应直接外推为生产 SLA。
 

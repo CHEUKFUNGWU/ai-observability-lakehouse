@@ -22,6 +22,16 @@ One concrete tool invocation, including its arguments metadata, result size, dur
 
 The transfer of work or control from a parent agent run to a distinct child agent run. A handoff is not an internal span performed by the same run.
 
+### External Observability Source
+
+A system outside this lakehouse that already captures AI runtime traces, spans, generations, scores, or sessions and can be adapted into the ODS/DWD contracts. It is not the warehouse system of record.
+_Avoid_: Warehouse source of truth, serving layer
+
+### Trace Envelope
+
+An external trace-level correlation boundary that groups runtime observations under one `trace_id`. A trace envelope is not automatically an Agent Run; it only becomes a run when the source provides task/run semantics.
+_Avoid_: Agent Run, Session
+
 ## Quality and Governance
 
 ### Retrieval Request
@@ -35,6 +45,11 @@ One explicit user feedback event, such as thumbs up/down, rating, regeneration, 
 ### Evaluation Judgment
 
 One quality judgment for one dimension of a request or run, produced by a human, LLM judge, ground truth comparison, classifier, or rule.
+
+### Score Event
+
+A generic quality or feedback signal emitted by an external observability source. It must be classified into a Feedback Action or Evaluation Judgment before entering DWD.
+_Avoid_: Evaluation Judgment, Feedback Action
 
 ### Guardrail Check
 

@@ -238,6 +238,56 @@ uv run python -m scripts.generate_mock_platform_health_logs --sample-count 12 --
 
 Platform thresholds are managed in `config/platform_health_thresholds.yaml`. All current metrics are upper-bound thresholds. The daily DWS retains the maximum observed value and marks a breach when that maximum exceeds the configured threshold.
 
+## Langfuse External Observability POC
+
+The Langfuse POC treats Langfuse as an External Observability Source per ADR 011. It normalizes representative Langfuse records into existing DWD-compatible event contracts and does not create Langfuse-specific DWD tables or ADS assets.
+
+Trace rules:
+
+- A Langfuse trace is a Trace Envelope by default. The envelope preserves `trace_id`, source identity, app/feature/user/session metadata, environment, observation count, and whether explicit run metadata exists.
+- A Trace Envelope does not automatically create an Agent Run.
+- An Agent Run is emitted only when trace metadata contains explicit run/task semantics: `run_id` or `agent_run_id`, and `task_type` or `agent_task_type`.
+- Span and chain observations map to Agent Span-compatible events and preserve `trace_id`, `span_id`, and `parent_span_id`.
+- Tool observations map to Agent Tool Call-compatible events only when a tool name, type, timing, status, and trace boundary can be derived.
+- Retriever observations map to Retrieval Request-compatible events only when query, knowledge base, embedding model, strategy, top-k, returned/hit counts, similarity, latency, and environment metadata are sufficient.
+- Unsupported or underspecified observations enter sanitized quarantine instead of being forced into the wrong DWD fact.
+
+Score Event split rules:
+
+- Langfuse Score Events are generic source signals and must be classified before DWD. They are not loaded into a standalone score fact.
+- Score `source`, `name`, and `config` drive classification. `user`, `manual`, feedback names, and configured feedback types emit Feedback Action-compatible events.
+- `evaluator`, `judge`, `test`, `dataset-run`, `automated`, configured evaluator types, evaluation dimensions, pass thresholds, or dataset-run metadata emit Evaluation Judgment-compatible events.
+- Feedback scores preserve allowed contract fields such as trace/request/run correlation, user/session metadata, feedback action type, rating value, comment hash/length, model, prompt version, and environment.
+- Evaluation scores preserve allowed contract fields such as trace/request/run correlation, evaluator type/model, evaluation dimension, normalized score, raw score, pass threshold, pass/fail, evaluated model, prompt version, latency, and environment.
+- Unknown, conflicting, targetless, or invalid-range Score Events enter sanitized quarantine with `_dq_errors`, source ids, trace ids where available, and a payload hash.
+
+Run the checked-in representative fixture:
+
+```bash
+uv run python -m scripts.normalize_langfuse_generations \
+  --input tests/fixtures/langfuse/generations.jsonl \
+  --output data/raw/langfuse_llm_requests/events.jsonl \
+  --quarantine-output data/warehouse/quarantine/dwd_ai_llm_request_di/langfuse_generations.jsonl
+```
+
+The output file is contract-compatible raw LLM Request JSONL for the existing Spark/Flink DWD path. The quarantine file contains underspecified or invalid generation records with `_dq_errors`, source ids and a payload hash; it does not store Langfuse prompt or response bodies. Normalized LLM Request events retain only `prompt_hash`, `response_hash`, `input_chars`, `output_chars` and token counts for prompt/response content.
+
+Trace and observation normalization is implemented at the Python boundary in `app/langfuse_trace.py`. It returns separate lists for trace envelopes, Agent Runs, Agent Spans, Agent Tool Calls, Retrieval Requests, Feedback Actions, Evaluation Judgments and quarantine records so callers can write each target to the existing ODS/DWD path. Standalone Score Event classification is implemented in `app/langfuse_score.py` for API/export payloads that are not embedded in trace records.
+
+To validate the POC boundary:
+
+```bash
+uv run pytest tests/test_langfuse_generation_normalization.py tests/test_langfuse_trace_normalization.py tests/test_langfuse_score_normalization.py -v
+```
+
+For a local Spark/Paimon smoke test, feed the normalized JSONL into the existing LLM Request backfill path:
+
+```bash
+uv run python -m scripts.spark_paimon_backfill \
+  --input data/raw/langfuse_llm_requests/events.jsonl \
+  --quarantine-output data/warehouse/quarantine/dwd_ai_llm_request_di/events.parquet
+```
+
 Build and load the executive weekly summary after the daily DWS Parquet outputs are available:
 
 ```bash

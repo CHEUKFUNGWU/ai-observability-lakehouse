@@ -44,6 +44,8 @@ Gravitino 不新增仓库业务层，也不改变 44 张物理表的命名与粒
 
 默认 Postgres CDC 只自动生产第一个 LLM topic；其他 topic 需要应用 producer、采集器或显式加载流程。
 
+Langfuse Score Event 是外部观测源的通用质量/反馈信号，不新增独立 ODS/DWD 事实表。采集适配器必须先按 `source`、`name` 和 `config` 分类：user/manual feedback 进入 Feedback Action 事件入口；evaluator/judge/test/dataset-run/automated score 进入 Evaluation Judgment 事件入口；目标缺失、分值越界、分类不明或分类冲突进入 quarantine。
+
 ## 4. DWD 事实表（12）
 
 | 表 | 粒度 | 主 ID/关联 |
