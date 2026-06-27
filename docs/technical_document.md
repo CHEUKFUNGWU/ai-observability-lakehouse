@@ -75,7 +75,7 @@
 ### 3.4 `sql/` 与 `config/`
 
 - `source_postgres_schema.sql`：本地 CDC 源表。
-- `create_doris_tables.sql`：44 表 Doris 物理模型和动态分区。
+- `create_doris_tables.sql`：46 表 Doris 物理模型和动态分区。
 - `doris_create_paimon_catalog.sql`：Doris 对 Paimon warehouse 的只读查询入口。
 - `doris_sync_paimon_dws.sql`、`load_dws_metrics_to_doris.py`：Paimon/Parquet 到 Doris local table 的同步路径。
 - `doris_dashboard_queries.sql`：12 个可复用消费查询。
@@ -213,4 +213,4 @@ uv run pytest \
 - Flink streaming percentile 能力有限，消费端必须区分 p95 与 max 上界。
 - 本地 Kafka 48 小时 retention 只适合演示，生产回放窗口需重新设计。
 - Gravitino 本地单实例与 filesystem catalog 适合开发环境；生产需要外部持久化、高可用、认证授权和 catalog 变更治理。
-- 契约覆盖在持续扩展，但并非所有 44 表字段都由同一个生成器自动产出 DDL；测试仍是防漂移的重要保障。
+- 契约覆盖在持续扩展，但并非所有 46 表字段都由同一个生成器自动产出 DDL；测试仍是防漂移的重要保障。

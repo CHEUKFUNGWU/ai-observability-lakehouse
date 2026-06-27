@@ -31,6 +31,36 @@ def test_columns_for_table_supports_executive_weekly_summary():
     assert columns[-1] == "total_ai_cost_amt_1w"
 
 
+def test_columns_for_table_supports_trace_health_detail_without_raw_text():
+    columns = columns_for_table("ads_observability_trace_health_detail")
+
+    assert columns[0] == "date"
+    assert "trace_id" in columns
+    assert "bottleneck_node_type" in columns
+    assert "child_observation_summary" == columns[-1]
+    assert "prompt_text" not in columns
+    assert "response_text" not in columns
+    assert "arguments_json" not in columns
+    assert "result_text" not in columns
+
+
+def test_columns_for_table_supports_evaluation_dataset_experiment_regression():
+    columns = columns_for_table(
+        "ads_observability_evaluation_dataset_experiment_regression"
+    )
+
+    assert columns[:4] == [
+        "dataset_name",
+        "experiment_name",
+        "baseline_variant",
+        "candidate_variant",
+    ]
+    assert "baseline_score_numerator" in columns
+    assert "candidate_estimated_cost_usd_denominator" == columns[-1]
+    assert "baseline_pass_rate" not in columns
+    assert "is_quality_regression" not in columns
+
+
 def test_columns_for_table_supports_platform_health():
     columns = columns_for_table("dws_ai_platform_component_health_1d")
 

@@ -30,8 +30,14 @@ REQUIRED_TEXT_FIELDS = (
 def normalize_generation_records(records: Iterable[dict[str, Any]]) -> tuple[list[dict], list[dict]]:
     valid: list[dict] = []
     quarantine: list[dict] = []
+    seen_source_payloads: set[str] = set()
 
     for record in records:
+        source_payload_hash = text_sha256(_canonical_json(record))
+        if source_payload_hash in seen_source_payloads:
+            continue
+        seen_source_payloads.add(source_payload_hash)
+
         normalized, errors = normalize_generation_record(record)
         if errors:
             quarantine.append(build_quarantine_record(record, normalized, errors))
@@ -95,7 +101,7 @@ def _build_llm_request_event(record: dict[str, Any]) -> dict:
     status = _normalize_status(record, metadata)
     error_type = _normalize_error_type(record, metadata, status)
     http_status = _to_int(_metadata_value(metadata, "http_status", "status_code"), default=500 if status == "error" else 200)
-    cost = _extract_cost(record, metadata)
+    cost, cost_source = _extract_cost_with_source(record, metadata)
 
     event = {
         "request_id": request_id,
@@ -149,6 +155,7 @@ def _build_llm_request_event(record: dict[str, Any]) -> dict:
         "error_type": error_type,
         "http_status": http_status,
         "estimated_cost_usd": cost,
+        "estimated_cost_source": cost_source,
         "mode": str(_metadata_value(metadata, "mode", default="replay")),
         "region": str(_metadata_value(metadata, "region", default="")),
         "environment": str(_metadata_value(metadata, "environment", "env", default="")),
@@ -222,15 +229,26 @@ def _extract_token_count(record: dict[str, Any], metadata: dict[str, Any], kind:
 
 
 def _extract_cost(record: dict[str, Any], metadata: dict[str, Any]) -> float:
-    value = _first_present(
+    return _extract_cost_with_source(record, metadata)[0]
+
+
+def _extract_cost_with_source(record: dict[str, Any], metadata: dict[str, Any]) -> tuple[float, str]:
+    langfuse_cost = _first_present(
         record,
         ("costDetails", "total"),
         ("costDetails", "totalCost"),
         ("cost_details", "total"),
         ("totalCost",),
-        default=_metadata_value(metadata, "estimated_cost_usd", "total_cost_usd", default=0.0),
+        default=None,
     )
-    return _to_float(value, default=0.0)
+    if langfuse_cost is not None:
+        return _to_float(langfuse_cost, default=0.0), "langfuse_cost_details"
+
+    metadata_cost = _metadata_value(metadata, "estimated_cost_usd", "total_cost_usd", default=None)
+    if metadata_cost is not None:
+        return _to_float(metadata_cost, default=0.0), "metadata_estimate"
+
+    return 0.0, "default_zero"
 
 
 def _normalize_status(record: dict[str, Any], metadata: dict[str, Any]) -> str:

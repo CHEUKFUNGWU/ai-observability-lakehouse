@@ -116,6 +116,155 @@ SELECT
 FROM paimon_lake.dwd.dwd_ai_evaluation_judgment_di
 GROUP BY `date`, app_name, feature_name, evaluation_dimension, evaluated_model_name;
 
+INSERT INTO paimon_lake.dws.dws_ai_prompt_version_request_1d
+WITH normalized_requests AS (
+    SELECT
+        `date`,
+        request_id,
+        CASE WHEN prompt_id IS NULL OR TRIM(prompt_id) = '' THEN 'unknown' ELSE prompt_id END AS prompt_id,
+        CASE WHEN prompt_version IS NULL OR TRIM(prompt_version) = '' THEN 'unknown' ELSE prompt_version END AS prompt_version,
+        CASE WHEN model_name IS NULL OR TRIM(model_name) = '' THEN 'unknown' ELSE model_name END AS model_name,
+        status,
+        latency_ms,
+        total_tokens,
+        estimated_cost_usd
+    FROM paimon_lake.dwd.dwd_ai_llm_request_di
+),
+request_metrics AS (
+    SELECT
+        `date`,
+        prompt_id,
+        prompt_version,
+        model_name,
+        COUNT(*) AS request_cnt_1d,
+        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS success_cnt_1d,
+        SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) AS error_cnt_1d,
+        AVG(latency_ms) AS avg_latency_ms,
+        CAST(0 AS BIGINT) AS p95_latency_ms,
+        SUM(total_tokens) AS total_token_cnt_1d,
+        SUM(estimated_cost_usd) AS estimated_cost_amt_1d
+    FROM normalized_requests
+    GROUP BY `date`, prompt_id, prompt_version, model_name
+),
+request_prompt_keys AS (
+    SELECT DISTINCT
+        `date`,
+        request_id,
+        prompt_id,
+        prompt_version,
+        model_name
+    FROM normalized_requests
+    WHERE request_id IS NOT NULL AND TRIM(request_id) <> ''
+),
+request_key_counts AS (
+    SELECT
+        `date`,
+        request_id,
+        COUNT(*) AS prompt_metadata_key_cnt
+    FROM request_prompt_keys
+    GROUP BY `date`, request_id
+),
+unique_request_prompt_keys AS (
+    SELECT
+        keys.`date`,
+        keys.request_id,
+        keys.prompt_id,
+        keys.prompt_version,
+        keys.model_name
+    FROM request_prompt_keys AS keys
+    JOIN request_key_counts AS counts
+      ON keys.`date` = counts.`date`
+     AND keys.request_id = counts.request_id
+    WHERE counts.prompt_metadata_key_cnt = 1
+),
+metadata_conflicts AS (
+    SELECT
+        keys.`date`,
+        keys.prompt_id,
+        keys.prompt_version,
+        keys.model_name,
+        COUNT(DISTINCT keys.request_id) AS metadata_conflict_cnt_1d
+    FROM request_prompt_keys AS keys
+    JOIN request_key_counts AS counts
+      ON keys.`date` = counts.`date`
+     AND keys.request_id = counts.request_id
+    WHERE counts.prompt_metadata_key_cnt > 1
+    GROUP BY keys.`date`, keys.prompt_id, keys.prompt_version, keys.model_name
+),
+attributed_evaluations AS (
+    SELECT
+        evaluations.`date`,
+        COALESCE(request_keys.prompt_id, 'unknown') AS prompt_id,
+        COALESCE(
+            request_keys.prompt_version,
+            CASE
+                WHEN evaluations.evaluated_prompt_version IS NULL OR TRIM(evaluations.evaluated_prompt_version) = '' THEN 'unknown'
+                ELSE evaluations.evaluated_prompt_version
+            END
+        ) AS prompt_version,
+        COALESCE(
+            request_keys.model_name,
+            CASE
+                WHEN evaluations.evaluated_model_name IS NULL OR TRIM(evaluations.evaluated_model_name) = '' THEN 'unknown'
+                ELSE evaluations.evaluated_model_name
+            END
+        ) AS model_name,
+        evaluations.score,
+        evaluations.passed
+    FROM paimon_lake.dwd.dwd_ai_evaluation_judgment_di AS evaluations
+    LEFT JOIN unique_request_prompt_keys AS request_keys
+      ON evaluations.`date` = request_keys.`date`
+     AND evaluations.request_id = request_keys.request_id
+),
+evaluation_metrics AS (
+    SELECT
+        `date`,
+        prompt_id,
+        prompt_version,
+        model_name,
+        COUNT(*) AS evaluation_cnt_1d,
+        SUM(CASE WHEN passed THEN 1 ELSE 0 END) AS pass_cnt_1d,
+        SUM(CASE WHEN NOT passed THEN 1 ELSE 0 END) AS fail_cnt_1d,
+        COALESCE(SUM(score), 0.0) AS evaluation_score_num_1d,
+        SUM(CASE WHEN score IS NOT NULL THEN 1 ELSE 0 END) AS evaluation_score_den_1d
+    FROM attributed_evaluations
+    GROUP BY `date`, prompt_id, prompt_version, model_name
+)
+SELECT
+    requests.`date`,
+    requests.prompt_id,
+    requests.prompt_version,
+    requests.model_name,
+    requests.request_cnt_1d,
+    requests.success_cnt_1d,
+    requests.error_cnt_1d,
+    requests.avg_latency_ms,
+    requests.p95_latency_ms,
+    requests.total_token_cnt_1d,
+    requests.estimated_cost_amt_1d,
+    COALESCE(evaluations.evaluation_cnt_1d, 0) AS evaluation_cnt_1d,
+    COALESCE(evaluations.pass_cnt_1d, 0) AS pass_cnt_1d,
+    COALESCE(evaluations.fail_cnt_1d, 0) AS fail_cnt_1d,
+    COALESCE(evaluations.evaluation_score_num_1d, 0.0) AS evaluation_score_num_1d,
+    COALESCE(evaluations.evaluation_score_den_1d, 0) AS evaluation_score_den_1d,
+    CASE
+        WHEN COALESCE(evaluations.evaluation_score_den_1d, 0) > 0
+        THEN evaluations.evaluation_score_num_1d / evaluations.evaluation_score_den_1d
+        ELSE CAST(NULL AS DOUBLE)
+    END AS avg_evaluation_score,
+    COALESCE(conflicts.metadata_conflict_cnt_1d, 0) AS metadata_conflict_cnt_1d
+FROM request_metrics AS requests
+LEFT JOIN evaluation_metrics AS evaluations
+  ON requests.`date` = evaluations.`date`
+ AND requests.prompt_id = evaluations.prompt_id
+ AND requests.prompt_version = evaluations.prompt_version
+ AND requests.model_name = evaluations.model_name
+LEFT JOIN metadata_conflicts AS conflicts
+  ON requests.`date` = conflicts.`date`
+ AND requests.prompt_id = conflicts.prompt_id
+ AND requests.prompt_version = conflicts.prompt_version
+ AND requests.model_name = conflicts.model_name;
+
 INSERT INTO paimon_lake.dws.dws_ai_llm_feature_env_request_1d
 SELECT
     `date`,

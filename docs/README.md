@@ -9,7 +9,7 @@
 | [产品文档](product_document.md) | 用户、场景、能力、边界和产品化优先级 |
 | [项目架构](architecture.md) | 组件职责、数据流、部署拓扑和设计边界 |
 | [技术文档](technical_document.md) | 模块、处理语义、契约、质量、测试与扩展流程 |
-| [数据模型](data_model.md) | 分层、44 表清单、粒度、关联和指标约束 |
+| [数据模型](data_model.md) | 分层、46 表清单、粒度、关联和指标约束 |
 | [数据血缘](data_lineage.md) | 域、作业、表和消费端血缘 |
 | [指标定义](metric_definitions.md) | 指标公式、窗口、分子分母和查询口径 |
 | [运行手册](runtime_runbook.md) | 启停、健康检查、仪表盘和故障恢复 |

@@ -13,3 +13,8 @@ def test_contract_grains_cover_core_runtime_and_summary_tables():
     assert TABLE_GRAINS["dws_ai_agent_orchestration_handoff_1d"] == (
         "one daily row per parent agent, child agent, and handoff type"
     )
+    assert TABLE_GRAINS["ads_observability_trace_health_detail"] == "one diagnostic row per unhealthy trace envelope"
+    assert TABLE_GRAINS["ads_observability_evaluation_dataset_experiment_regression"] == (
+        "one row per dataset, experiment, baseline/candidate variant-model-prompt pair, "
+        "and evaluation dimension"
+    )

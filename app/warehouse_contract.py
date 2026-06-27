@@ -110,6 +110,11 @@ TABLE_GRAINS: dict[str, str] = {
     "dws_ai_llm_session_request_1d": "one daily row per app and feature",
     "dws_ai_agent_orchestration_handoff_1d": "one daily row per parent agent, child agent, and handoff type",
     "dws_ai_platform_component_health_1d": "one daily row per component and metric",
+    "ads_observability_trace_health_detail": "one diagnostic row per unhealthy trace envelope",
+    "ads_observability_evaluation_dataset_experiment_regression": (
+        "one row per dataset, experiment, baseline/candidate variant-model-prompt pair, "
+        "and evaluation dimension"
+    ),
 }
 
 
@@ -793,7 +798,13 @@ PROMPT_VERSION_REQUEST_1D_FLINK_COLUMNS: tuple[str, ...] = (
     "p95_latency_ms BIGINT",
     "total_token_cnt_1d BIGINT",
     "estimated_cost_amt_1d DOUBLE",
+    "evaluation_cnt_1d BIGINT",
+    "pass_cnt_1d BIGINT",
+    "fail_cnt_1d BIGINT",
+    "evaluation_score_num_1d DOUBLE",
+    "evaluation_score_den_1d BIGINT",
     "avg_evaluation_score DOUBLE",
+    "metadata_conflict_cnt_1d BIGINT",
 )
 
 PROMPT_VERSION_REQUEST_1D_DORIS_COLUMNS: tuple[str, ...] = (
@@ -808,7 +819,13 @@ PROMPT_VERSION_REQUEST_1D_DORIS_COLUMNS: tuple[str, ...] = (
     "p95_latency_ms BIGINT NOT NULL",
     "total_token_cnt_1d BIGINT NOT NULL",
     "estimated_cost_amt_1d DOUBLE NOT NULL",
+    "evaluation_cnt_1d BIGINT NOT NULL",
+    "pass_cnt_1d BIGINT NOT NULL",
+    "fail_cnt_1d BIGINT NOT NULL",
+    "evaluation_score_num_1d DOUBLE NOT NULL",
+    "evaluation_score_den_1d BIGINT NOT NULL",
     "avg_evaluation_score DOUBLE NULL",
+    "metadata_conflict_cnt_1d BIGINT NOT NULL",
 )
 
 LLM_FEATURE_ENV_REQUEST_1D_FLINK_COLUMNS: tuple[str, ...] = (
@@ -989,6 +1006,86 @@ LLM_SESSION_REQUEST_1D_DORIS_COLUMNS: tuple[str, ...] = (
     "resolved_session_cnt_1d BIGINT NOT NULL",
 )
 
+TRACE_HEALTH_DETAIL_DORIS_COLUMNS: tuple[str, ...] = (
+    "`date` DATE NOT NULL",
+    "trace_id VARCHAR(128) NOT NULL",
+    "run_id VARCHAR(128) NOT NULL",
+    "span_id VARCHAR(128) NOT NULL",
+    "request_id VARCHAR(128) NOT NULL",
+    "tool_call_id VARCHAR(128) NOT NULL",
+    "retrieval_id VARCHAR(128) NOT NULL",
+    "app_name VARCHAR(256) NOT NULL",
+    "feature_name VARCHAR(256) NOT NULL",
+    "user_id VARCHAR(128) NOT NULL",
+    "session_id VARCHAR(128) NOT NULL",
+    "agent_id VARCHAR(128) NOT NULL",
+    "agent_name VARCHAR(256) NOT NULL",
+    "model_name VARCHAR(256) NOT NULL",
+    "provider VARCHAR(128) NOT NULL",
+    "knowledge_base_id VARCHAR(128) NOT NULL",
+    "bottleneck_node_type VARCHAR(32) NOT NULL",
+    "bottleneck_node_id VARCHAR(128) NOT NULL",
+    "bottleneck_name VARCHAR(256) NOT NULL",
+    "bottleneck_status VARCHAR(32) NOT NULL",
+    "bottleneck_error_type VARCHAR(128) NULL",
+    "bottleneck_latency_ms BIGINT NOT NULL",
+    "bottleneck_cost_usd DOUBLE NOT NULL",
+    "bottleneck_input_size BIGINT NOT NULL",
+    "bottleneck_output_size BIGINT NOT NULL",
+    "prompt_hash VARCHAR(128) NOT NULL",
+    "response_hash VARCHAR(128) NOT NULL",
+    "query_text_hash VARCHAR(128) NOT NULL",
+    "trace_latency_ms BIGINT NOT NULL",
+    "trace_cost_usd DOUBLE NOT NULL",
+    "trace_total_tokens BIGINT NOT NULL",
+    "trace_status VARCHAR(32) NOT NULL",
+    "is_high_cost_trace BOOLEAN NOT NULL",
+    "is_slow_trace BOOLEAN NOT NULL",
+    "is_failed_trace BOOLEAN NOT NULL",
+    "has_failed_child_observation BOOLEAN NOT NULL",
+    "has_slow_child_observation BOOLEAN NOT NULL",
+    "has_missing_child_facts BOOLEAN NOT NULL",
+    "declared_llm_call_count BIGINT NOT NULL",
+    "observed_llm_request_count BIGINT NOT NULL",
+    "declared_tool_call_count BIGINT NOT NULL",
+    "observed_tool_call_count BIGINT NOT NULL",
+    "declared_retrieval_count BIGINT NOT NULL",
+    "observed_retrieval_count BIGINT NOT NULL",
+    "child_observation_summary VARCHAR(512) NOT NULL",
+)
+
+EVALUATION_DATASET_EXPERIMENT_REGRESSION_DORIS_COLUMNS: tuple[str, ...] = (
+    "dataset_name VARCHAR(256) NOT NULL",
+    "experiment_name VARCHAR(256) NOT NULL",
+    "baseline_variant VARCHAR(128) NOT NULL",
+    "candidate_variant VARCHAR(128) NOT NULL",
+    "baseline_model_name VARCHAR(256) NOT NULL",
+    "baseline_prompt_version VARCHAR(64) NOT NULL",
+    "candidate_model_name VARCHAR(256) NOT NULL",
+    "candidate_prompt_version VARCHAR(64) NOT NULL",
+    "evaluation_dimension VARCHAR(64) NOT NULL",
+    "experiment_start_date DATE NOT NULL",
+    "experiment_end_date DATE NOT NULL",
+    "baseline_evaluation_count BIGINT NOT NULL",
+    "baseline_pass_count BIGINT NOT NULL",
+    "baseline_fail_count BIGINT NOT NULL",
+    "baseline_score_numerator DOUBLE NOT NULL",
+    "baseline_score_denominator BIGINT NOT NULL",
+    "baseline_latency_ms_numerator BIGINT NOT NULL",
+    "baseline_latency_ms_denominator BIGINT NOT NULL",
+    "baseline_estimated_cost_usd_numerator DOUBLE NOT NULL",
+    "baseline_estimated_cost_usd_denominator BIGINT NOT NULL",
+    "candidate_evaluation_count BIGINT NOT NULL",
+    "candidate_pass_count BIGINT NOT NULL",
+    "candidate_fail_count BIGINT NOT NULL",
+    "candidate_score_numerator DOUBLE NOT NULL",
+    "candidate_score_denominator BIGINT NOT NULL",
+    "candidate_latency_ms_numerator BIGINT NOT NULL",
+    "candidate_latency_ms_denominator BIGINT NOT NULL",
+    "candidate_estimated_cost_usd_numerator DOUBLE NOT NULL",
+    "candidate_estimated_cost_usd_denominator BIGINT NOT NULL",
+)
+
 EVALUATION_JUDGMENT_DATA_FIELDS: tuple[FieldContract, ...] = tuple(
     field for field in EVALUATION_JUDGMENT_FIELDS if field.name != "date"
 )
@@ -1110,7 +1207,13 @@ def build_prompt_version_request_1d_projection(metrics: DataFrame) -> DataFrame:
         "p95_latency_ms",
         "total_token_cnt_1d",
         "estimated_cost_amt_1d",
+        "evaluation_cnt_1d",
+        "pass_cnt_1d",
+        "fail_cnt_1d",
+        "evaluation_score_num_1d",
+        "evaluation_score_den_1d",
         "avg_evaluation_score",
+        "metadata_conflict_cnt_1d",
     )
 
 
@@ -1788,6 +1891,23 @@ def render_llm_session_request_1d_flink_columns(indent: str = "    ") -> str:
 def render_llm_session_request_1d_doris_columns(indent: str = "    ") -> str:
     lines = [f"{indent}{column}," for column in LLM_SESSION_REQUEST_1D_DORIS_COLUMNS[:-1]]
     lines.append(f"{indent}{LLM_SESSION_REQUEST_1D_DORIS_COLUMNS[-1]}")
+    return "\n".join(lines)
+
+
+def render_trace_health_detail_doris_columns(indent: str = "    ") -> str:
+    lines = [f"{indent}{column}," for column in TRACE_HEALTH_DETAIL_DORIS_COLUMNS[:-1]]
+    lines.append(f"{indent}{TRACE_HEALTH_DETAIL_DORIS_COLUMNS[-1]}")
+    return "\n".join(lines)
+
+
+def render_evaluation_dataset_experiment_regression_doris_columns(
+    indent: str = "    ",
+) -> str:
+    lines = [
+        f"{indent}{column},"
+        for column in EVALUATION_DATASET_EXPERIMENT_REGRESSION_DORIS_COLUMNS[:-1]
+    ]
+    lines.append(f"{indent}{EVALUATION_DATASET_EXPERIMENT_REGRESSION_DORIS_COLUMNS[-1]}")
     return "\n".join(lines)
 
 

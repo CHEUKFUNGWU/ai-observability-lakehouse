@@ -170,6 +170,21 @@ def test_paimon_layers_use_expected_tables():
     assert "PARTITIONED BY (`date`)" in dws_sql
 
 
+def test_flink_prompt_version_dws_reuses_existing_prompt_table_and_score_numerators():
+    dws_sql = read_asset("flink/sql/30_build_dws_from_dwd.sql")
+    prompt_version_insert = dws_sql.split(
+        "INSERT INTO paimon_lake.dws.dws_ai_prompt_version_request_1d", 1
+    )[1].split("INSERT INTO", 1)[0]
+
+    assert "INSERT INTO paimon_lake.dws.dws_ai_prompt_version_request_1d" in dws_sql
+    assert "unique_request_prompt_keys" in dws_sql
+    assert "evaluation_score_num_1d" in dws_sql
+    assert "evaluation_score_den_1d" in dws_sql
+    assert "metadata_conflict_cnt_1d" in dws_sql
+    assert "CAST(0 AS BIGINT) AS p95_latency_ms" in prompt_version_insert
+    assert "CAST(MAX(latency_ms) AS BIGINT) AS p95_latency_ms" not in prompt_version_insert
+
+
 def test_flink_sql_layer_dependencies_are_explicit():
     ingest_sql = read_asset("flink/sql/10_ingest_ods_to_kafka.sql")
     dwd_sql = read_asset("flink/sql/20_build_dwd_from_kafka_ods.sql")
