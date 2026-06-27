@@ -47,6 +47,29 @@ def test_normalize_langfuse_generations_maps_fixture_without_raw_text():
     assert RAW_TEXT_FIELDS.isdisjoint(row)
 
 
+def test_normalize_langfuse_generations_deduplicates_replayed_generation():
+    record = load_fixture()[0]
+
+    events, quarantine = normalize_generation_records([record, record])
+
+    assert [row["request_id"] for row in events] == ["gen_success_001"]
+    assert quarantine == []
+
+
+def test_normalize_langfuse_generations_marks_estimated_cost_source():
+    langfuse_record = load_fixture()[0]
+    metadata_record = json.loads(json.dumps(langfuse_record))
+    metadata_record["id"] = "gen_metadata_cost_001"
+    metadata_record.pop("costDetails")
+    metadata_record["metadata"]["estimated_cost_usd"] = 0.00031
+
+    events, quarantine = normalize_generation_records([langfuse_record, metadata_record])
+
+    assert quarantine == []
+    assert events[0]["estimated_cost_source"] == "langfuse_cost_details"
+    assert events[1]["estimated_cost_source"] == "metadata_estimate"
+
+
 def test_langfuse_error_generation_maps_to_error_llm_request():
     events, _ = normalize_generation_records(load_fixture())
     row = events[1]

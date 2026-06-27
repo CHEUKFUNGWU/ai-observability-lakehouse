@@ -13,6 +13,7 @@ from app.warehouse_contract import (
     render_compliance_data_retention_doris_columns,
     render_cost_team_request_1d_doris_columns,
     render_evaluation_feature_judgment_1d_doris_columns,
+    render_evaluation_dataset_experiment_regression_doris_columns,
     render_evaluation_judgment_doris_columns,
     render_feedback_action_doris_columns,
     render_feedback_feature_action_1d_doris_columns,
@@ -28,6 +29,7 @@ from app.warehouse_contract import (
     render_prompt_version_request_1d_doris_columns,
     render_retrieval_knowledge_base_request_1d_doris_columns,
     render_retrieval_request_doris_columns,
+    render_trace_health_detail_doris_columns,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -80,6 +82,15 @@ def test_doris_schema_defines_llm_agent_and_tool_tables():
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_daily_budget" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_cost_monthly_chargeback" in sql
     assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_executive_weekly_summary" in sql
+    assert "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_trace_health_detail" in sql
+    assert (
+        "CREATE TABLE IF NOT EXISTS "
+        "ai_observability.ads_observability_evaluation_dataset_experiment_regression"
+    ) in sql
+    assert (
+        "DROP TABLE IF EXISTS "
+        "ai_observability.ads_observability_evaluation_dataset_experiment_regression;"
+    ) in sql
     assert "CREATE MATERIALIZED VIEW IF NOT EXISTS ai_observability.mv_daily_summary" in sql
 
 
@@ -234,6 +245,85 @@ def test_doris_prompt_version_daily_metrics_columns_match_contract():
     assert render_prompt_version_request_1d_doris_columns() in prompt_section
 
 
+def test_doris_prompt_version_ads_contains_comparison_numerators():
+    sql = (REPO_ROOT / "sql" / "create_doris_tables.sql").read_text(encoding="utf-8")
+    ads_section = sql.split(
+        "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_prompt_prompt_version_metrics",
+        1,
+    )[1]
+    ads_section = ads_section.split("CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_retrieval_daily_quality", 1)[0]
+
+    for column in (
+        "success_count BIGINT NOT NULL",
+        "error_count BIGINT NOT NULL",
+        "total_tokens BIGINT NOT NULL",
+        "evaluation_count BIGINT NOT NULL",
+        "pass_count BIGINT NOT NULL",
+        "fail_count BIGINT NOT NULL",
+        "evaluation_score_numerator DOUBLE NOT NULL",
+        "evaluation_score_denominator BIGINT NOT NULL",
+        "metadata_conflict_count BIGINT NOT NULL",
+    ):
+        assert column in ads_section
+    assert "success_rate" not in ads_section
+    assert "pass_rate" not in ads_section
+
+
+def test_doris_trace_health_detail_columns_match_contract_and_privacy_rules():
+    sql = (REPO_ROOT / "sql" / "create_doris_tables.sql").read_text(encoding="utf-8")
+    ads_section = sql.split(
+        "CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_trace_health_detail",
+        1,
+    )[1]
+    ads_section = ads_section.split("CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_compliance_access_audit_di", 1)[0]
+
+    assert render_trace_health_detail_doris_columns() in ads_section
+    assert "prompt_text" not in ads_section
+    assert "response_text" not in ads_section
+    assert "arguments_json" not in ads_section
+    assert "result_text" not in ads_section
+    assert "DUPLICATE KEY(`date`, trace_id)" in ads_section
+
+
+def test_doris_evaluation_dataset_experiment_regression_columns_match_contract():
+    sql = (REPO_ROOT / "sql" / "create_doris_tables.sql").read_text(encoding="utf-8")
+    ads_section = sql.split(
+        "CREATE TABLE IF NOT EXISTS "
+        "ai_observability.ads_observability_evaluation_dataset_experiment_regression",
+        1,
+    )[1]
+    ads_section = ads_section.split(
+        "CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_compliance_access_audit_di",
+        1,
+    )[0]
+
+    assert render_evaluation_dataset_experiment_regression_doris_columns() in ads_section
+    assert (
+        "DUPLICATE KEY(\n"
+        "    dataset_name,\n"
+        "    experiment_name,\n"
+        "    baseline_variant,\n"
+        "    candidate_variant,\n"
+        "    baseline_model_name,\n"
+        "    baseline_prompt_version,\n"
+        "    candidate_model_name,\n"
+        "    candidate_prompt_version,\n"
+        "    evaluation_dimension\n"
+        ")"
+    ) in ads_section
+    for derived_column in (
+        "baseline_pass_rate",
+        "candidate_pass_rate",
+        "score_delta",
+        "cost_increase_rate",
+        "latency_increase_rate",
+        "is_quality_regression",
+        "is_cost_increase",
+        "is_latency_increase",
+    ):
+        assert derived_column not in ads_section
+
+
 def test_doris_llm_feature_env_daily_metrics_columns_match_contract():
     sql = (REPO_ROOT / "sql" / "create_doris_tables.sql").read_text(encoding="utf-8")
     feature_env_section = sql.split("CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_llm_feature_env_request_1d", 1)[1]
@@ -365,3 +455,11 @@ def test_doris_dashboard_queries_cover_tier_three_business_questions():
     assert "FROM ai_observability.dws_ai_agent_orchestration_handoff_1d" in sql
     assert "FROM ai_observability.dws_ai_platform_component_health_1d" in sql
     assert "WHERE is_breach = TRUE" in sql
+    assert (
+        "FROM ai_observability."
+        "ads_observability_evaluation_dataset_experiment_regression"
+    ) in sql
+    assert "NULLIF(baseline_evaluation_count, 0)" in sql
+    assert "AS is_quality_regression" in sql
+    assert "AS is_cost_increase" in sql
+    assert "AS is_latency_increase" in sql

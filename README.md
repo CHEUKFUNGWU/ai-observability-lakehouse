@@ -30,14 +30,14 @@ flowchart LR
 
 ## 实现范围
 
-当前 Doris 数据产品清单包含 44 张表：
+当前 Doris 数据产品清单包含 46 张表：
 
 | 层 | 数量 | 覆盖范围 |
 |---|---:|---|
 | DWD | 12 | LLM、Agent、检索、反馈、安全、评测、发布、合规、编排 |
 | DWS | 16 | 日/小时/会话、团队/区域/环境、质量、成本、健康指标 |
 | DIM | 7 | 模型、模型版本、Prompt、团队、用户、知识库、规则 |
-| ADS | 9 | 成本、SLA、质量、安全、满意度和管理周报 |
+| ADS | 11 | 成本、SLA、质量、安全、满意度、trace 健康、evaluation dataset/experiment regression 和管理周报 |
 
 Postgres CDC 的默认自动入口当前只覆盖 LLM 请求。其他域已有事件模型、Kafka ODS/Flink、Spark、Paimon/Doris 和测试资产，但生产接入方需要向相应 Kafka topic 或批量入口发送事件。
 

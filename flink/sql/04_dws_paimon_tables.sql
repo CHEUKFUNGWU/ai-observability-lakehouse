@@ -155,7 +155,13 @@ CREATE TABLE IF NOT EXISTS paimon_lake.dws.dws_ai_prompt_version_request_1d (
     p95_latency_ms BIGINT,
     total_token_cnt_1d BIGINT,
     estimated_cost_amt_1d DOUBLE,
+    evaluation_cnt_1d BIGINT,
+    pass_cnt_1d BIGINT,
+    fail_cnt_1d BIGINT,
+    evaluation_score_num_1d DOUBLE,
+    evaluation_score_den_1d BIGINT,
     avg_evaluation_score DOUBLE,
+    metadata_conflict_cnt_1d BIGINT,
     PRIMARY KEY (`date`, prompt_id, prompt_version, model_name) NOT ENFORCED
 ) PARTITIONED BY (`date`) WITH (
     'bucket' = '4'

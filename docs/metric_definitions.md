@@ -218,7 +218,126 @@ ORDER BY total_tokens DESC;
 
 ---
 
-## 13. Tool Failure Rate
+## 13. Prompt Version Comparison
+
+### Grain
+
+`date`, `prompt_id`, `prompt_version`, `model_name` in `ads_observability_prompt_prompt_version_metrics`.
+
+### Stored Components
+
+- `request_count`, `success_count`, `error_count`
+- `total_tokens`, `estimated_cost_usd`
+- `avg_latency_ms`, `p95_latency_ms`
+- `evaluation_count`, `pass_count`, `fail_count`
+- `evaluation_score_numerator`, `evaluation_score_denominator`
+- `metadata_conflict_count`
+
+### Derived Rates
+
+Rates are derived at query time from summed numerators and denominators:
+
+```sql
+SELECT
+    prompt_id,
+    prompt_version,
+    model_name,
+    SUM(success_count) / NULLIF(SUM(request_count), 0) AS success_rate,
+    SUM(error_count) / NULLIF(SUM(request_count), 0) AS error_rate,
+    SUM(pass_count) / NULLIF(SUM(evaluation_count), 0) AS pass_rate,
+    SUM(evaluation_score_numerator) / NULLIF(SUM(evaluation_score_denominator), 0) AS avg_evaluation_score
+FROM ai_observability.ads_observability_prompt_prompt_version_metrics
+GROUP BY prompt_id, prompt_version, model_name;
+```
+
+### Metadata Handling
+
+Missing `prompt_id`, `prompt_version`, or `model_name` values are grouped as `unknown`. If the same `request_id` maps to multiple prompt/version/model keys on the same date, `metadata_conflict_count` exposes the conflict and evaluation scores are not duplicated across conflicting prompt keys.
+
+---
+
+## 14. Trace Health Detail
+
+### Grain
+
+One row per unhealthy Trace Envelope in `ads_observability_trace_health_detail`.
+
+### Stored Components
+
+- Correlation IDs: `trace_id`, `run_id`, `span_id`, `request_id`, `tool_call_id`, `retrieval_id`
+- Bottleneck metadata: `bottleneck_node_type`, `bottleneck_node_id`, `bottleneck_status`, `bottleneck_error_type`
+- Metrics: `trace_latency_ms`, `trace_cost_usd`, `trace_total_tokens`, `bottleneck_latency_ms`, `bottleneck_cost_usd`
+- Flags: `is_high_cost_trace`, `is_slow_trace`, `is_failed_trace`, `has_failed_child_observation`, `has_slow_child_observation`, `has_missing_child_facts`
+- Privacy-safe payload fields: `prompt_hash`, `response_hash`, `query_text_hash`, `bottleneck_input_size`, `bottleneck_output_size`
+
+`trace_latency_ms` is the elapsed time from the earliest available child/run start to the latest derived end. When source facts do not contain usable timestamps, it falls back to the maximum observed node duration.
+
+### SQL
+
+```sql
+SELECT
+    date,
+    trace_id,
+    bottleneck_node_type,
+    bottleneck_node_id,
+    trace_latency_ms,
+    trace_cost_usd,
+    trace_status,
+    child_observation_summary
+FROM ai_observability.ads_observability_trace_health_detail
+WHERE is_high_cost_trace
+   OR is_slow_trace
+   OR is_failed_trace
+ORDER BY date DESC, trace_cost_usd DESC, trace_latency_ms DESC;
+```
+
+### Metadata Handling
+
+The ADS is built directly from LLM request, Agent run/span/tool call, and retrieval DWD facts. It intentionally does not create a trace/session DWS because Langfuse trace boundaries are Trace Envelopes until applications provide stable run or session semantics. Raw prompt/response text, tool arguments, and tool result text are excluded.
+
+---
+
+## 15. Evaluation Dataset/Experiment Regression
+
+### Grain
+
+One row per dataset, experiment, configured baseline/candidate variant-model-prompt pair, and evaluation dimension in `ads_observability_evaluation_dataset_experiment_regression`.
+
+### Stored Components
+
+Each side stores:
+
+- `evaluation_count`, `pass_count`, `fail_count`
+- `score_numerator`, `score_denominator`
+- `latency_ms_numerator`, `latency_ms_denominator`
+- `estimated_cost_usd_numerator`, `estimated_cost_usd_denominator`
+
+The concrete columns use `baseline_` and `candidate_` prefixes. Dataset, experiment, variant role, model, prompt version, and evaluation dimension are comparison dimensions. Latency and estimated cost are attributed from the LLM Request with the same `request_id`; their denominators count only matched, non-null request measures.
+
+### Derived Metrics
+
+```text
+baseline_pass_rate = baseline_pass_count / baseline_evaluation_count
+candidate_pass_rate = candidate_pass_count / candidate_evaluation_count
+baseline_avg_score = baseline_score_numerator / baseline_score_denominator
+candidate_avg_score = candidate_score_numerator / candidate_score_denominator
+baseline_avg_latency_ms = baseline_latency_ms_numerator / baseline_latency_ms_denominator
+candidate_avg_latency_ms = candidate_latency_ms_numerator / candidate_latency_ms_denominator
+baseline_avg_estimated_cost_usd = baseline_estimated_cost_usd_numerator / baseline_estimated_cost_usd_denominator
+candidate_avg_estimated_cost_usd = candidate_estimated_cost_usd_numerator / candidate_estimated_cost_usd_denominator
+score_delta = candidate_avg_score - baseline_avg_score
+pass_rate_delta = candidate_pass_rate - baseline_pass_rate
+cost_increase_rate = (candidate_avg_estimated_cost_usd - baseline_avg_estimated_cost_usd) / baseline_avg_estimated_cost_usd
+latency_increase_rate = (candidate_avg_latency_ms - baseline_avg_latency_ms) / baseline_avg_latency_ms
+```
+
+`is_quality_regression` is true when candidate average score or pass rate is lower than baseline beyond the configured comparison threshold. Cost and latency flags compare their candidate increase rates with their thresholds. The checked-in Doris query uses zero thresholds; the Spark comparison helper accepts explicit thresholds. Every division is guarded; a zero denominator yields NULL for the rate and dependent indicator instead of false or zero.
+
+Rates and indicators are query-time outputs, not physical ADS columns. Multiple component rows must be summed before division; daily or partial rates must never be averaged.
+
+---
+
+## 16. Tool Failure Rate
 
 ### Definition
 
@@ -239,7 +358,7 @@ ORDER BY failure_rate DESC;
 
 ---
 
-## 14. Resolved Session Count
+## 17. Resolved Session Count
 
 ### Definition
 
@@ -249,7 +368,7 @@ Session duration is measured from the first request start to the last request co
 
 ---
 
-## 15. Executive Weekly Weighted Metrics
+## 18. Executive Weekly Weighted Metrics
 
 ### Definition
 
@@ -266,7 +385,7 @@ total_ai_cost_amt_1w = llm_cost_amt_1w + agent_cost_amt_1w
 
 ---
 
-## 16. Agent Handoff Metrics
+## 19. Agent Handoff Metrics
 
 ### Definition
 
@@ -284,7 +403,7 @@ The Spark batch builder calculates `p95_handoff_latency_ms` with `percentile_app
 
 ---
 
-## 17. Retention Enforcement Metrics
+## 20. Retention Enforcement Metrics
 
 ### Definition
 
@@ -292,7 +411,7 @@ Retention enforcement volume is derived from `dwd_ai_compliance_data_retention_d
 
 ---
 
-## 18. Platform Health Breach
+## 21. Platform Health Breach
 
 ### Definition
 

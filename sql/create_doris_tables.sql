@@ -44,6 +44,8 @@ DROP TABLE IF EXISTS ai_observability.ads_observability_guardrail_daily_violatio
 DROP TABLE IF EXISTS ai_observability.ads_observability_cost_daily_budget;
 DROP TABLE IF EXISTS ai_observability.ads_observability_cost_monthly_chargeback;
 DROP TABLE IF EXISTS ai_observability.ads_observability_executive_weekly_summary;
+DROP TABLE IF EXISTS ai_observability.ads_observability_trace_health_detail;
+DROP TABLE IF EXISTS ai_observability.ads_observability_evaluation_dataset_experiment_regression;
 DROP MATERIALIZED VIEW IF EXISTS ai_observability.mv_daily_summary;
 
 CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_llm_request_di
@@ -844,7 +846,13 @@ CREATE TABLE IF NOT EXISTS ai_observability.dws_ai_prompt_version_request_1d
     p95_latency_ms BIGINT NOT NULL,
     total_token_cnt_1d BIGINT NOT NULL,
     estimated_cost_amt_1d DOUBLE NOT NULL,
-    avg_evaluation_score DOUBLE NULL
+    evaluation_cnt_1d BIGINT NOT NULL,
+    pass_cnt_1d BIGINT NOT NULL,
+    fail_cnt_1d BIGINT NOT NULL,
+    evaluation_score_num_1d DOUBLE NOT NULL,
+    evaluation_score_den_1d BIGINT NOT NULL,
+    avg_evaluation_score DOUBLE NULL,
+    metadata_conflict_cnt_1d BIGINT NOT NULL
 )
 DUPLICATE KEY(`date`, prompt_id, prompt_version, model_name)
 PARTITION BY RANGE(`date`) ()
@@ -1024,10 +1032,19 @@ CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_prompt_prompt_vers
     prompt_version VARCHAR(64) NOT NULL,
     model_name VARCHAR(256) NOT NULL,
     request_count BIGINT NOT NULL,
+    success_count BIGINT NOT NULL,
+    error_count BIGINT NOT NULL,
+    total_tokens BIGINT NOT NULL,
+    estimated_cost_usd DOUBLE NOT NULL,
     avg_latency_ms DOUBLE NOT NULL,
     p95_latency_ms BIGINT NOT NULL,
-    error_count BIGINT NOT NULL,
-    estimated_cost_usd DOUBLE NOT NULL
+    evaluation_count BIGINT NOT NULL,
+    pass_count BIGINT NOT NULL,
+    fail_count BIGINT NOT NULL,
+    evaluation_score_numerator DOUBLE NOT NULL,
+    evaluation_score_denominator BIGINT NOT NULL,
+    avg_evaluation_score DOUBLE NULL,
+    metadata_conflict_count BIGINT NOT NULL
 )
 DUPLICATE KEY(`date`, prompt_id, prompt_version, model_name)
 PARTITION BY RANGE(`date`) ()
@@ -1250,6 +1267,116 @@ PROPERTIES (
     "dynamic_partition.prefix" = "p",
     "dynamic_partition.buckets" = "4",
     "dynamic_partition.create_history_partition" = "true"
+);
+
+CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_trace_health_detail
+(
+    `date` DATE NOT NULL,
+    trace_id VARCHAR(128) NOT NULL,
+    run_id VARCHAR(128) NOT NULL,
+    span_id VARCHAR(128) NOT NULL,
+    request_id VARCHAR(128) NOT NULL,
+    tool_call_id VARCHAR(128) NOT NULL,
+    retrieval_id VARCHAR(128) NOT NULL,
+    app_name VARCHAR(256) NOT NULL,
+    feature_name VARCHAR(256) NOT NULL,
+    user_id VARCHAR(128) NOT NULL,
+    session_id VARCHAR(128) NOT NULL,
+    agent_id VARCHAR(128) NOT NULL,
+    agent_name VARCHAR(256) NOT NULL,
+    model_name VARCHAR(256) NOT NULL,
+    provider VARCHAR(128) NOT NULL,
+    knowledge_base_id VARCHAR(128) NOT NULL,
+    bottleneck_node_type VARCHAR(32) NOT NULL,
+    bottleneck_node_id VARCHAR(128) NOT NULL,
+    bottleneck_name VARCHAR(256) NOT NULL,
+    bottleneck_status VARCHAR(32) NOT NULL,
+    bottleneck_error_type VARCHAR(128) NULL,
+    bottleneck_latency_ms BIGINT NOT NULL,
+    bottleneck_cost_usd DOUBLE NOT NULL,
+    bottleneck_input_size BIGINT NOT NULL,
+    bottleneck_output_size BIGINT NOT NULL,
+    prompt_hash VARCHAR(128) NOT NULL,
+    response_hash VARCHAR(128) NOT NULL,
+    query_text_hash VARCHAR(128) NOT NULL,
+    trace_latency_ms BIGINT NOT NULL,
+    trace_cost_usd DOUBLE NOT NULL,
+    trace_total_tokens BIGINT NOT NULL,
+    trace_status VARCHAR(32) NOT NULL,
+    is_high_cost_trace BOOLEAN NOT NULL,
+    is_slow_trace BOOLEAN NOT NULL,
+    is_failed_trace BOOLEAN NOT NULL,
+    has_failed_child_observation BOOLEAN NOT NULL,
+    has_slow_child_observation BOOLEAN NOT NULL,
+    has_missing_child_facts BOOLEAN NOT NULL,
+    declared_llm_call_count BIGINT NOT NULL,
+    observed_llm_request_count BIGINT NOT NULL,
+    declared_tool_call_count BIGINT NOT NULL,
+    observed_tool_call_count BIGINT NOT NULL,
+    declared_retrieval_count BIGINT NOT NULL,
+    observed_retrieval_count BIGINT NOT NULL,
+    child_observation_summary VARCHAR(512) NOT NULL
+)
+DUPLICATE KEY(`date`, trace_id)
+PARTITION BY RANGE(`date`) ()
+DISTRIBUTED BY HASH(trace_id) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "MONTH",
+    "dynamic_partition.start" = "-12",
+    "dynamic_partition.end" = "3",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "4",
+    "dynamic_partition.create_history_partition" = "true"
+);
+
+CREATE TABLE IF NOT EXISTS ai_observability.ads_observability_evaluation_dataset_experiment_regression
+(
+    dataset_name VARCHAR(256) NOT NULL,
+    experiment_name VARCHAR(256) NOT NULL,
+    baseline_variant VARCHAR(128) NOT NULL,
+    candidate_variant VARCHAR(128) NOT NULL,
+    baseline_model_name VARCHAR(256) NOT NULL,
+    baseline_prompt_version VARCHAR(64) NOT NULL,
+    candidate_model_name VARCHAR(256) NOT NULL,
+    candidate_prompt_version VARCHAR(64) NOT NULL,
+    evaluation_dimension VARCHAR(64) NOT NULL,
+    experiment_start_date DATE NOT NULL,
+    experiment_end_date DATE NOT NULL,
+    baseline_evaluation_count BIGINT NOT NULL,
+    baseline_pass_count BIGINT NOT NULL,
+    baseline_fail_count BIGINT NOT NULL,
+    baseline_score_numerator DOUBLE NOT NULL,
+    baseline_score_denominator BIGINT NOT NULL,
+    baseline_latency_ms_numerator BIGINT NOT NULL,
+    baseline_latency_ms_denominator BIGINT NOT NULL,
+    baseline_estimated_cost_usd_numerator DOUBLE NOT NULL,
+    baseline_estimated_cost_usd_denominator BIGINT NOT NULL,
+    candidate_evaluation_count BIGINT NOT NULL,
+    candidate_pass_count BIGINT NOT NULL,
+    candidate_fail_count BIGINT NOT NULL,
+    candidate_score_numerator DOUBLE NOT NULL,
+    candidate_score_denominator BIGINT NOT NULL,
+    candidate_latency_ms_numerator BIGINT NOT NULL,
+    candidate_latency_ms_denominator BIGINT NOT NULL,
+    candidate_estimated_cost_usd_numerator DOUBLE NOT NULL,
+    candidate_estimated_cost_usd_denominator BIGINT NOT NULL
+)
+DUPLICATE KEY(
+    dataset_name,
+    experiment_name,
+    baseline_variant,
+    candidate_variant,
+    baseline_model_name,
+    baseline_prompt_version,
+    candidate_model_name,
+    candidate_prompt_version,
+    evaluation_dimension
+)
+DISTRIBUTED BY HASH(dataset_name, experiment_name) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1"
 );
 
 CREATE TABLE IF NOT EXISTS ai_observability.dwd_ai_compliance_access_audit_di

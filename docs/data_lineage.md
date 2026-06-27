@@ -32,7 +32,7 @@ flowchart LR
       DWD["12 DWD facts"]
       DIM["7 DIM snapshots"]
       DWS["16 DWS summaries"]
-      ADS["9 ADS marts"]
+      ADS["10 ADS marts"]
     end
 
     subgraph Metadata["Metadata Control Plane"]
@@ -83,9 +83,9 @@ flowchart LR
 
 | 域 | Source/ODS | DWD | DWS | ADS/消费 |
 |---|---|---|---|---|
-| LLM | DeepSeek/mock/Postgres → LLM ODS | LLM request | feature 1h/1d、session、env、region | SLA、cost anomaly、overview |
-| Agent | mock/Hermes/app hooks | run、span、tool call | agent、tool、agent team | reliability、tool、overview |
-| Retrieval | app/mock → retrieval ODS | retrieval request | knowledge-base request | retrieval quality |
+| LLM | DeepSeek/mock/Postgres → LLM ODS | LLM request | feature 1h/1d、session、env、region | SLA、cost anomaly、trace health、overview |
+| Agent | mock/Hermes/app hooks | run、span、tool call | agent、tool、agent team | reliability、tool、trace health、overview |
+| Retrieval | app/mock → retrieval ODS | retrieval request | knowledge-base request | retrieval quality、trace health |
 | Feedback | app/mock → feedback ODS | feedback action | feature action | satisfaction、session resolution |
 | Guardrail | app/mock → guardrail ODS | guardrail check | rule check | guardrail violation |
 | Evaluation | evaluator/mock → evaluation ODS | evaluation judgment | feature judgment | prompt version、executive summary |
@@ -105,7 +105,9 @@ dwd_ai_llm_request_di
   ├─> dws_ai_llm_feature_env_request_1d
   ├─> dws_ai_llm_region_request_1d
   ├─> dws_ai_cost_team_request_1d <─ dim_user_df / dim_team_df
-  ├─> dws_ai_prompt_version_request_1d <─ evaluation DWS
+  ├─> dws_ai_prompt_version_request_1d <─ dwd_ai_evaluation_judgment_di (request_id score attribution)
+  │    └─> ads_observability_prompt_prompt_version_metrics
+  ├─> ads_observability_trace_health_detail
   ├─> ads_observability_sla_feature_report
   └─> ads_observability_cost_feature_anomaly
 ```
@@ -114,13 +116,24 @@ dwd_ai_llm_request_di
 dwd_ai_agent_run_di + dwd_ai_agent_span_di
   ├─> dws_ai_agent_agent_run_1d
   ├─> dws_ai_agent_team_run_1d <─ dim_user_df
+  ├─> ads_observability_trace_health_detail
   └─> dws_ai_cost_team_request_1d
 
 dwd_ai_agent_tool_call_di
-  └─> dws_ai_agent_tool_tool_call_1d
+  ├─> dws_ai_agent_tool_tool_call_1d
+  └─> ads_observability_trace_health_detail
+
+dwd_ai_retrieval_request_di
+  ├─> dws_ai_retrieval_knowledge_base_request_1d
+  └─> ads_observability_trace_health_detail
 
 dwd_ai_agent_orchestration_di
   └─> dws_ai_agent_orchestration_handoff_1d
+
+dwd_ai_evaluation_judgment_di + dwd_ai_llm_request_di
+  + controlled request→dataset/experiment/variant assignments
+  + controlled experiment→baseline/candidate comparison config
+  └─> ads_observability_evaluation_dataset_experiment_regression
 ```
 
 ## 4. 管理与仪表盘血缘
@@ -139,6 +152,8 @@ Superset 的三个当前 bundle 使用 Doris 表和 `sql/doris_dashboard_queries
 | `spark_transform_*.py` | Raw JSONL/Parquet | ODS/DWD/Quarantine |
 | `spark_build_dws_*.py` | DWD + DIM | DWS |
 | `spark_build_ads_*.py` | DWD/DWS/DIM + rules | ADS |
+| `spark_build_ads_trace_health_detail.py` | LLM request、Agent run/span/tool call、retrieval DWD facts | `ads_observability_trace_health_detail` |
+| `spark_build_ads_evaluation_dataset_experiment_regression.py` | Evaluation Judgment、LLM Request、受控 assignment/comparison config | `ads_observability_evaluation_dataset_experiment_regression` |
 | `spark_build_dim_*.py` | 配置/事件/seed data | DIM snapshots |
 | `load_dws_metrics_to_doris.py` | Parquet/Paimon-derived outputs | Doris local tables |
 | `provision_superset_dashboards.py` | Doris datasets/query specs | Superset DB/dataset/chart/dashboard |

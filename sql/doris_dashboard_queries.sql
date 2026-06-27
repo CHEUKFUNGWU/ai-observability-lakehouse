@@ -182,3 +182,96 @@ FROM
 ) a
 JOIN ai_observability.dim_model_df m ON a.model_name = m.model_name
 ORDER BY estimated_cost_usd DESC;
+
+-- 13. Evaluation dataset/experiment baseline-vs-candidate regression.
+SELECT
+    dataset_name,
+    experiment_name,
+    baseline_variant,
+    candidate_variant,
+    baseline_model_name,
+    baseline_prompt_version,
+    candidate_model_name,
+    candidate_prompt_version,
+    evaluation_dimension,
+    experiment_start_date,
+    experiment_end_date,
+    baseline_evaluation_count,
+    candidate_evaluation_count,
+    baseline_pass_count,
+    candidate_pass_count,
+    baseline_fail_count,
+    candidate_fail_count,
+    baseline_pass_rate,
+    candidate_pass_rate,
+    baseline_avg_score,
+    candidate_avg_score,
+    baseline_avg_latency_ms,
+    candidate_avg_latency_ms,
+    baseline_avg_estimated_cost_usd,
+    candidate_avg_estimated_cost_usd,
+    candidate_avg_score - baseline_avg_score AS score_delta,
+    candidate_pass_rate - baseline_pass_rate AS pass_rate_delta,
+    ROUND(
+        (candidate_avg_estimated_cost_usd - baseline_avg_estimated_cost_usd)
+        / NULLIF(baseline_avg_estimated_cost_usd, 0),
+        6
+    ) AS cost_increase_rate,
+    ROUND(
+        (candidate_avg_latency_ms - baseline_avg_latency_ms)
+        / NULLIF(baseline_avg_latency_ms, 0),
+        6
+    ) AS latency_increase_rate,
+    (
+        candidate_avg_score < baseline_avg_score
+        OR candidate_pass_rate < baseline_pass_rate
+    ) AS is_quality_regression,
+    candidate_avg_estimated_cost_usd > baseline_avg_estimated_cost_usd AS is_cost_increase,
+    candidate_avg_latency_ms > baseline_avg_latency_ms AS is_latency_increase
+FROM
+(
+    SELECT
+        dataset_name,
+        experiment_name,
+        baseline_variant,
+        candidate_variant,
+        baseline_model_name,
+        baseline_prompt_version,
+        candidate_model_name,
+        candidate_prompt_version,
+        evaluation_dimension,
+        experiment_start_date,
+        experiment_end_date,
+        baseline_evaluation_count,
+        candidate_evaluation_count,
+        baseline_pass_count,
+        candidate_pass_count,
+        baseline_fail_count,
+        candidate_fail_count,
+        ROUND(baseline_pass_count / NULLIF(baseline_evaluation_count, 0), 6) AS baseline_pass_rate,
+        ROUND(candidate_pass_count / NULLIF(candidate_evaluation_count, 0), 6) AS candidate_pass_rate,
+        ROUND(baseline_score_numerator / NULLIF(baseline_score_denominator, 0), 6) AS baseline_avg_score,
+        ROUND(candidate_score_numerator / NULLIF(candidate_score_denominator, 0), 6) AS candidate_avg_score,
+        ROUND(baseline_latency_ms_numerator / NULLIF(baseline_latency_ms_denominator, 0), 2)
+            AS baseline_avg_latency_ms,
+        ROUND(candidate_latency_ms_numerator / NULLIF(candidate_latency_ms_denominator, 0), 2)
+            AS candidate_avg_latency_ms,
+        ROUND(
+            baseline_estimated_cost_usd_numerator
+            / NULLIF(baseline_estimated_cost_usd_denominator, 0),
+            8
+        ) AS baseline_avg_estimated_cost_usd,
+        ROUND(
+            candidate_estimated_cost_usd_numerator
+            / NULLIF(candidate_estimated_cost_usd_denominator, 0),
+            8
+        ) AS candidate_avg_estimated_cost_usd
+    FROM ai_observability.ads_observability_evaluation_dataset_experiment_regression
+) experiment_comparison
+ORDER BY
+    is_quality_regression DESC,
+    is_cost_increase DESC,
+    is_latency_increase DESC,
+    dataset_name,
+    experiment_name,
+    evaluation_dimension;

@@ -240,7 +240,7 @@ Platform thresholds are managed in `config/platform_health_thresholds.yaml`. All
 
 ## Langfuse External Observability POC
 
-The Langfuse POC treats Langfuse as an External Observability Source per ADR 011. It normalizes representative Langfuse records into existing DWD-compatible event contracts and does not create Langfuse-specific DWD tables or ADS assets.
+The Langfuse POC treats Langfuse as an External Observability Source per ADR 011. It normalizes representative Langfuse records into existing DWD-compatible event contracts and does not create Langfuse-specific DWD tables.
 
 Trace rules:
 
@@ -261,6 +261,49 @@ Score Event split rules:
 - Evaluation scores preserve allowed contract fields such as trace/request/run correlation, evaluator type/model, evaluation dimension, normalized score, raw score, pass threshold, pass/fail, evaluated model, prompt version, latency, and environment.
 - Unknown, conflicting, targetless, or invalid-range Score Events enter sanitized quarantine with `_dq_errors`, source ids, trace ids where available, and a payload hash.
 
+Prompt version comparison:
+
+- Langfuse-derived generation observations enter the existing `dwd_ai_llm_request_di`; evaluator/judge/test Score Events enter `dwd_ai_evaluation_judgment_di`.
+- `dws_ai_prompt_version_request_1d` remains the single prompt-version DWS. It joins evaluation judgments through `request_id` when a unique LLM request prompt key exists, so a score is not copied across every prompt sharing the same version/model.
+- Missing prompt metadata is grouped as `unknown`. Same-day `request_id` conflicts across multiple prompt/version/model keys are surfaced through `metadata_conflict_cnt_1d`.
+- `ads_observability_prompt_prompt_version_metrics` consumes the DWS and keeps counts plus score numerator/denominator. Success rate, error rate, pass rate and average score are derived from summed numerators and denominators in queries.
+
+Trace health detail:
+
+- `ads_observability_trace_health_detail` is the first trace-level diagnostic product for Langfuse-backed traces.
+- It consumes existing DWD facts directly: LLM requests, Agent runs, Agent spans, Agent tool calls, and Retrieval requests.
+- Trace latency uses the earliest available child/run start time through the latest derived end time. Facts without usable timestamps fall back to the maximum node duration.
+- It identifies high-cost, slow, failed, failed-child, slow-child, and missing-child-fact traces without adding a session or trace DWS table.
+- Bottleneck nodes are labeled as `llm_generation`, `agent_span`, `tool_call`, `retrieval`, or `orchestration`.
+- Output keeps correlation IDs, hashes, sizes, metadata, status, latency, token, and cost metrics only. It does not include prompt/response bodies, tool arguments, or tool result text.
+
+Build the ADS detail after the relevant DWD facts are available:
+
+```bash
+uv run python -m scripts.spark_build_ads_trace_health_detail
+```
+
+Evaluation dataset/experiment regression:
+
+- The assignment Parquet is controlled metadata with columns `request_id`, `dataset_name`, `experiment_name`, and `variant_name`.
+- The comparison-config Parquet has `dataset_name`, `experiment_name`, `baseline_variant`, and `candidate_variant`.
+- These inputs are ADS configuration. They are not loaded as dataset/experiment DWD, DWS, or DIM entities.
+- Missing required metadata, equal baseline/candidate variants, and conflicting request assignments are excluded. Preserve the source config outside the ADS output for audit and reproducibility.
+
+Build and load the component ADS after Evaluation Judgment and LLM Request facts are available:
+
+```bash
+uv run python -m scripts.spark_build_ads_evaluation_dataset_experiment_regression \
+  --assignment-input data/config/evaluation_experiment_assignments.parquet \
+  --comparison-config-input data/config/evaluation_experiment_comparisons.parquet
+
+uv run python -m scripts.load_dws_metrics_to_doris \
+  --input data/warehouse/ads/ads_observability_evaluation_dataset_experiment_regression.parquet \
+  --table ads_observability_evaluation_dataset_experiment_regression
+```
+
+The physical ADS stores only additive baseline/candidate components. Use query 13 in `sql/doris_dashboard_queries.sql` or `build_evaluation_dataset_experiment_regression_comparison` to derive guarded pass rates, averages, deltas, and quality/cost/latency indicators. A zero denominator returns NULL. This stage intentionally does not create a complete dataset/experiment domain model or another Prompt version comparison ADS.
+
 Run the checked-in representative fixture:
 
 ```bash
@@ -270,14 +313,14 @@ uv run python -m scripts.normalize_langfuse_generations \
   --quarantine-output data/warehouse/quarantine/dwd_ai_llm_request_di/langfuse_generations.jsonl
 ```
 
-The output file is contract-compatible raw LLM Request JSONL for the existing Spark/Flink DWD path. The quarantine file contains underspecified or invalid generation records with `_dq_errors`, source ids and a payload hash; it does not store Langfuse prompt or response bodies. Normalized LLM Request events retain only `prompt_hash`, `response_hash`, `input_chars`, `output_chars` and token counts for prompt/response content.
+The output file is contract-compatible raw LLM Request JSONL for the existing Spark/Flink DWD path. Exact replayed source payloads are processed once per normalization batch. The adapter-level `estimated_cost_source` distinguishes Langfuse cost details, metadata estimates, and default zero values; the existing DWD projection continues to store only `estimated_cost_usd`. The quarantine file contains underspecified or invalid generation records with `_dq_errors`, source ids and a payload hash; it does not store Langfuse prompt or response bodies. Normalized LLM Request events retain only `prompt_hash`, `response_hash`, `input_chars`, `output_chars` and token counts for prompt/response content.
 
 Trace and observation normalization is implemented at the Python boundary in `app/langfuse_trace.py`. It returns separate lists for trace envelopes, Agent Runs, Agent Spans, Agent Tool Calls, Retrieval Requests, Feedback Actions, Evaluation Judgments and quarantine records so callers can write each target to the existing ODS/DWD path. Standalone Score Event classification is implemented in `app/langfuse_score.py` for API/export payloads that are not embedded in trace records.
 
 To validate the POC boundary:
 
 ```bash
-uv run pytest tests/test_langfuse_generation_normalization.py tests/test_langfuse_trace_normalization.py tests/test_langfuse_score_normalization.py -v
+uv run pytest tests/test_langfuse_generation_normalization.py tests/test_langfuse_trace_normalization.py tests/test_langfuse_score_normalization.py tests/test_ads_trace_health_detail.py tests/test_ads_evaluation_dataset_experiment_regression.py -v
 ```
 
 For a local Spark/Paimon smoke test, feed the normalized JSONL into the existing LLM Request backfill path:
